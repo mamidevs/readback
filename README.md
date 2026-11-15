@@ -116,7 +116,7 @@ claude plugin eval . --trust-plugin --scaffold --allow-tools Bash Write Edit --a
 - Each case runs 3 times. Pass `--runs 1` for a short run.
 - The runs need Claude Code 2.1.269 or later. They use your account and cost model calls.
 
-`checks/resume.sh` tests the resume rule with two real sessions and your own settings.
+`checks/resume.sh` tests the resume rule with two real sessions. It does not load your user settings.
 The first session leaves an open task that no file shows. The second session must find it in `CURRENT.md`.
 The script writes a test folder in `~/logbook`. Read the script first.
 

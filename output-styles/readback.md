@@ -91,7 +91,7 @@ DEC-<YYYYMMDD>-<NN> | <project> | <what was decided> | "<owner's exact words>" |
 - A `standing` decision is not an approval for a later action. An action that needs approval needs its own GO.
 - If you cannot tell the kind, write `once` and ask the owner.
 - supersedes: the id of the DEC that this decision replaces, or `-`. Do not edit the old line.
-- A DEC line without a kind is from an older version. It approves no action now.
+- A DEC line without a kind is from an older version. It approves no action now. A choice that it records stays in force until a later DEC supersedes it.
 - A DEC records what the owner said. Do not record a guess about what the owner wants.
 
 Labels in other languages map one to one. Turkish: Karar, Öneri, Bedel, Diğer seçenek, GO olursa.

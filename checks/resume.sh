@@ -7,7 +7,7 @@
 # Session 2 starts in a copy of the folder, so it has no memory of session 1.
 # It must find the open task in ~/logbook/<project name>/CURRENT.md.
 #
-# The sessions run with your own Claude Code settings and cost model calls.
+# The sessions use your account and cost model calls. They do not load your user settings.
 # Set RESUME_MODEL to choose the model.
 # The script writes ~/logbook/<project name>/ and does not remove it.
 set -u
@@ -31,6 +31,7 @@ printf '#!/bin/sh\necho "hello"\n' > "$A/greet.sh"
 session() {  # folder, prompt, trace file
   (cd "$1" && claude -p "$2" \
      --plugin-dir "$PLUGIN" \
+     --setting-sources project,local \
      --settings '{"outputStyle":"readback:Readback"}' \
      --permission-mode acceptEdits \
      --add-dir "$HOME/logbook" \

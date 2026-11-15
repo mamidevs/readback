@@ -19,7 +19,7 @@ It does not conform to any of them.
 | R3 | Use the active voice. Name who did the action. | all messages |
 | R4 | Use one word for one meaning. Use each fixed word only as section 2 defines it. | all messages |
 | R5 | Copy paths, commands, numbers and exit codes exactly. Do not paraphrase evidence. | all messages |
-| R6 | Write records in English. An instruction has at most 20 words. A description has at most 25. | LOG, CONTRACT, HANDOFF, DEC |
+| R6 | Write records in English. An instruction has at most 20 words. A description has at most 25. | LOG, CONTRACT, HANDOFF, DEC, CURRENT |
 | R7 | Speak to the owner in the owner's language. A field has at most 2 lines. A list has at most 5 items. | BRIEF, DECISION |
 | R8 | Do not translate fixed words, ids, code or commands. | all messages |
 | R9 | Do not write a secret. Write `<secret>` in its place. This rule wins over R5 and over an exact quote. | all messages |
@@ -90,7 +90,7 @@ DEC-<YYYYMMDD>-<NN> | <project> | <what was decided> | "<owner's exact words>" |
 - A `standing` decision is not an approval for a later action. An action that needs approval needs its own GO.
 - If you cannot tell the kind, write `once` and ask the owner.
 - supersedes: the id of the DEC that this decision replaces, or `-`. Do not edit the old line.
-- A DEC line without a kind is from an older version. It approves no action now.
+- A DEC line without a kind is from an older version. It approves no action now. A choice that it records stays in force until a later DEC supersedes it.
 - A DEC records what the owner said. Do not record a guess about what the owner wants.
 
 Labels in other languages map one to one. Turkish: Karar, Öneri, Bedel, Diğer seçenek, GO olursa.
