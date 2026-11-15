@@ -1,22 +1,22 @@
 # Example: one task, all five message types
 
 The project is `shop-api`. The owner wants to stop password guessing on the login endpoint.
-The owner speaks Turkish. Records are English.
+The owner speaks English in this example. In another language only the labels and the owner's sentences change.
 
-## 1. DECISION (lead to owner, in the owner's language)
-
-```
-Karar          Giriş limitini proxy'de değil uygulamada mı kuralım?
-Öneri          Uygulama. Tek değişiklik bütün ortamları kapsar.
-Bedel          Yeni bir modül. Tek revert ile geri alınır.
-Diğer seçenek  Proxy kuralı: kod değişmez, ama staging'de proxy yok.
-GO olursa      Sözleşmeyi yazar, işçiyi başlatırım.
-```
-
-The owner answers: "GO, 5 deneme olsun".
+## 1. DECISION (lead to owner)
 
 ```
-DEC-20261115-01 | shop-api | Rate limit in the app | "GO, 5 deneme olsun" | 2026-11-15 | standing | -
+DECISION   Do we set the login limit in the app and not in the proxy?
+RECOMMEND  The app. One change covers every environment.
+COST       One new module. One revert undoes it.
+OTHERS     A proxy rule: no code change, but staging has no proxy.
+IF GO      I write the contract and start the worker.
+```
+
+The owner answers: "GO, 5 tries".
+
+```
+DEC-20261115-01 | shop-api | Rate limit in the app | "GO, 5 tries" | 2026-11-15 | standing | -
 ```
 
 ## 2. CONTRACT (lead to worker)
@@ -70,23 +70,13 @@ ACCEPTED  no | 2026-11-15 | The state is PARTIAL. ACC-3 is UNVERIFIED.
 ## 5. LOG (lead to record)
 
 ```
-LOG-20261115-01 | shop-api | code:shop-api@4f2a91c | Login answers 429 after 5 failed tries in 1 minute. | Stop password guessing. | DEC-20261115-01 "GO, 5 deneme olsun" | HND-20261115-01
+LOG-20261115-01 | shop-api | code:shop-api@4f2a91c | Login answers 429 after 5 failed tries in 1 minute. | Stop password guessing. | DEC-20261115-01 "GO, 5 tries" | HND-20261115-01
 ```
 
-## 6. BRIEF (lead to owner, in the owner's language)
+## 6. BRIEF (lead to owner)
 
 ```
-Yapılan          Login artık 1 dakikada 5 hatalı denemeden sonra 429 dönüyor. Sen "GO, 5 deneme olsun" dedin.
-Senden beklenen  İstemci IP'sini proxy mi belirlesin? Şu an istemci bir başlığı değiştirip limiti aşabilir.
-Bilmen gereken   Limit deposu çökerse ne olacağı test edilmedi (UNVERIFIED).
-Yapılmayan       Depo çöktüğünde girişe izin veren testin yazılması.
-Sonraki adım     IP kararını ver; ardından eksik testi yazdırırım.
-```
-
-The same brief for an owner who speaks English. The quote stays as the owner typed it.
-
-```
-DID        Login now answers 429 after 5 failed tries in 1 minute. You said "GO, 5 deneme olsun".
+DID        Login now answers 429 after 5 failed tries in 1 minute. You said "GO, 5 tries".
 NEEDS YOU  Should the proxy set the client IP? Today a client can change one header and pass the limit.
 KNOW       No test covers a limiter store that is down (UNVERIFIED).
 OPEN       The test that allows the login when the store is down.
@@ -109,17 +99,17 @@ NEXT      Ask the owner the client IP question.
 
 ## 8. The next session
 
-The owner starts a new session and writes: "kaldığımız yerden devam et".
+The owner starts a new session and writes: "Continue where we stopped."
 The lead reads `CURRENT.md`, the newer LOG lines, `HND-20261115-01` and the state of the repository. Then it answers.
 
 ```
-Amaç: login'de parola denemelerini sınırlamak. Limit uygulamada, 5 deneme (DEC-20261115-01).
-Açık: istemci IP'sini proxy mi belirlesin, kararı sende. Limit deposu çökünce çalışan test yazılmadı.
-Sonraki adım: IP kararını ver; ardından eksik testi yazdırırım.
+Goal: stop password guessing on login. The limit is in the app, 5 tries (DEC-20261115-01).
+Open: you decide if the proxy sets the client IP. No test covers a limiter store that is down.
+Next: decide the client IP question. Then I start the missing test.
 ```
 
-The owner answers: "proxy belirlesin".
+The owner answers: "The proxy sets it."
 
 ```
-DEC-20261116-01 | shop-api | The proxy sets the client IP. | "proxy belirlesin" | 2026-11-16 | standing | -
+DEC-20261116-01 | shop-api | The proxy sets the client IP. | "The proxy sets it." | 2026-11-16 | standing | -
 ```

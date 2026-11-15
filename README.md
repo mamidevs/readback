@@ -45,7 +45,7 @@ Then turn the style on in a session:
 This is the brief at the end of the example task.
 
 ```
-DID        Login now answers 429 after 5 failed tries in 1 minute. You said "GO, 5 deneme olsun".
+DID        Login now answers 429 after 5 failed tries in 1 minute. You said "GO, 5 tries".
 NEEDS YOU  Should the proxy set the client IP? Today a client can change one header and pass the limit.
 KNOW       No test covers a limiter store that is down (UNVERIFIED).
 OPEN       The test that allows the login when the store is down.
