@@ -1,8 +1,8 @@
-# Readback Protocol v0.3
+# Readback Protocol v0.4
 
 Status: approved. DEC-20261115-01, the owner said "go" on 2026-11-15.
-This text includes Amendment 01 (DEC-20261115-04), Amendment 02 (DEC-20261115-07), Amendment 03 (DEC-20261115-12) and Amendment 04 (DEC-20261115-15).
-Amendment 03 changed the meaning of two fixed words. Amendment 04 changed the DEC line. Each change gave the text a new number.
+This text includes Amendment 01 (DEC-20261115-04), Amendment 02 (DEC-20261115-07), Amendment 03 (DEC-20261115-12), Amendment 04 (DEC-20261115-15) and Amendment 05 (DEC-20261116-01).
+Amendment 03 changed the meaning of two fixed words. Amendment 04 changed the DEC line. Amendment 05 added teammates at other providers. Each change gave the text a new number.
 
 One format for what the lead says and what it records.
 The owner reads less. A message that leaves items out says how many and where they are.
@@ -256,3 +256,22 @@ When the owner asks to continue earlier work, do these steps before the work.
 - A `once` decision from an earlier session approves nothing now. Ask again.
 - If no CURRENT.md exists, say so. Read the last 20 lines of the LOG.
 - If the owner does not name the project, use the project of the session's folder. If it has no records, ask which project.
+
+## 7. Teammates at other providers
+
+A teammate can run at another provider than the lead. Sections 2 to 6 stay the same for that teammate.
+
+- Use a teammate at another provider only when the owner's local table names it.
+- The lead gives out the record ids before it delegates. Only the lead writes records.
+- A change of provider does not change the contract, the checks, the approvals or the permissions.
+- A teammate gets only the context that its contract needs.
+- A call that fails gives no verdict. Write `JUDGE none`. The lead does not accept the work.
+- A FAIL never sends the handoff to another judge.
+
+The lead adds one line below the stored handoff for each teammate at another provider.
+
+```
+execution  <provider> | <model requested> | <effort requested> | <transport> | <run id or none>
+```
+
+Write the requested values. Write the model that the host reports only when it differs from the request.

@@ -102,9 +102,9 @@ def places(t, bg=False):
          f'<line x1="480" y1="77" x2="480" y2="147" stroke="{t["muted"]}" stroke-width="1.2" stroke-dasharray="4 4" '
          f'marker-start="url(#a-muted)" marker-end="url(#a-muted)"/>',
          text(490, 100, "model calls", t["muted"], 11, anchor="start"),
-         text(790, 286, "readback adds no path out", t["accent"], 12, SANS, 600)]
+         text(790, 286, "no path out by default", t["accent"], 12, SANS, 600)]
     return wrap(w, h, "The repository installs rules into Claude Code. Claude Code writes records to a local "
-                      "logbook folder. readback adds no path out of the machine.", "".join(b), t, bg)
+                      "logbook folder. By default readback adds no path out of the machine.", "".join(b), t, bg)
 
 
 def main():

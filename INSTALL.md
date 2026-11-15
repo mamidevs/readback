@@ -47,6 +47,18 @@ For every project, set this key in `~/.claude/settings.json`:
 
 The three agents are `readback:explorer`, `readback:worker` and `readback:judge`.
 
+## A judge at another provider (optional)
+
+This step needs the `codex` command and its login.
+
+```
+cp TEAMMATES.example.md ~/logbook/TEAMMATES.md
+```
+
+Edit the model and the effort in the `judge` row.
+The other provider then sees the contract, the handoff and the repository folder of each judged task.
+Remove the file to turn it off.
+
 ## Try it without an install
 
 ```

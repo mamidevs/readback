@@ -83,15 +83,30 @@ Eleven words have one fixed meaning each.
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/places-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/places-light.svg">
-  <img alt="The repository installs rules into Claude Code. Claude Code writes records to a local logbook folder. readback adds no path out of the machine." src="docs/places-light.svg">
+  <img alt="The repository installs rules into Claude Code. Claude Code writes records to a local logbook folder. By default readback adds no path out of the machine." src="docs/places-light.svg">
 </picture>
 
-*readback adds one path in and one path down. It adds none out.*
+*readback adds one path in and one path down. It adds none out unless you name a teammate at another provider.*
 
-- The repository holds rules: the protocol, one output style and three agents.
+- The repository holds rules: the protocol, one output style, three agents and one skill.
 - `~/logbook` holds your records: one folder for each project. `LOG.md` has one line for each change and each decision. `records/` has one file for each contract and each handoff. `CURRENT.md` is the short summary that a new session reads first.
 - readback has no server, no hook and no upload.
+- A teammate at another provider is off by default. When `~/logbook/TEAMMATES.md` names one, that provider sees the contract, the handoff and the repository folder.
 - The model that writes a record has read it, as it reads the rest of your session.
+
+## A judge at another provider
+
+The protocol asks for a judge at a different provider when one exists.
+readback can send a handoff to OpenAI Codex through one read-only `codex exec` call.
+
+```
+cp TEAMMATES.example.md ~/logbook/TEAMMATES.md
+```
+
+- The table names the model and the effort. Edit it for your account.
+- The call has a deadline. A call that fails gives no verdict, and the lead does not accept the work.
+- A FAIL never sends the handoff to another judge.
+- `checks/outside-judge.sh` runs the two judge fixtures through that call.
 
 ## Evals
 
@@ -125,7 +140,7 @@ The script writes a test folder in `~/logbook`. Read the script first.
 - The style and the agents are instructions. They are not enforcement. Set hard limits in the permission and sandbox settings of your CLI.
 - By default the readback arrives with the handoff. It shows a wrong start after the work. Only the confirmed readback stops a wrong start.
 - The evals do not test the output style. `claude plugin eval` has no documented way to select one. Only `checks/resume.sh` runs the style.
-- readback runs on Claude Code. No package exists for other CLIs.
+- The lead runs on Claude Code. No package exists for other CLIs. Only the judge can run at another provider, and only through the `codex` command.
 - No task tracker integration ships.
 
 ## Lineage
@@ -146,15 +161,19 @@ The capital word READBACK in the protocol is that step. The lowercase name `read
 
 | File | Content |
 |---|---|
-| [PROTOCOL.md](PROTOCOL.md) | The standard, v0.3 |
+| [PROTOCOL.md](PROTOCOL.md) | The standard, v0.4 |
 | [EXAMPLE.md](EXAMPLE.md) | One task with all five message types |
 | [INSTALL.md](INSTALL.md) | Install, check, update, remove |
 | [AMENDMENT-01.md](AMENDMENT-01.md) | The first amendment and its reasons |
 | [AMENDMENT-02.md](AMENDMENT-02.md) | The second amendment and its reasons |
 | [AMENDMENT-03.md](AMENDMENT-03.md) | The third amendment and its reasons |
 | [AMENDMENT-04.md](AMENDMENT-04.md) | The fourth amendment and its reasons |
-| `output-styles/`, `agents/` | The Claude Code plugin |
+| [AMENDMENT-05.md](AMENDMENT-05.md) | The fifth amendment and its reasons |
+| `output-styles/`, `agents/`, `skills/` | The Claude Code plugin |
+| `scripts/outside-judge.sh` | The call to a judge at another provider |
+| [TEAMMATES.example.md](TEAMMATES.example.md) | The table of teammates at other providers |
 | `evals/` | Six eval cases for `claude plugin eval` |
 | `checks/resume.sh` | A two-session check of the resume rule |
+| `checks/outside-judge.sh` | A check of the judge at another provider |
 | `docs/figures.py` | Writes the two figures |
 | [LICENSE](LICENSE) | MIT |

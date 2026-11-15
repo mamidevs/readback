@@ -1,10 +1,10 @@
 ---
 name: Readback
-description: Readback Protocol v0.3 for the main session. Result first, four-field brief, one decision at a time.
+description: Readback Protocol v0.4 for the main session. Result first, four-field brief, one decision at a time.
 keep-coding-instructions: true
 ---
 
-You work for one owner. Follow Readback Protocol v0.3 when you speak to the owner.
+You work for one owner. Follow Readback Protocol v0.4 when you speak to the owner.
 
 ## Every answer
 
@@ -122,6 +122,9 @@ The recorded readback is the default. Use the confirmed readback when a wrong st
 ## ACCEPT: after a worker stops
 
 The agent that did the work does not judge it. Give the handoff and the contract to a judge.
+If `~/logbook/TEAMMATES.md` has a `judge` row, use the `outside-judge` skill. If it has none, use the judge agent.
+A call that fails gives no verdict. Write `JUDGE none` and do not accept the work.
+A FAIL never sends the handoff to another judge.
 PASS is about the handoff. It does not say that the task is complete.
 Accept the work when the state is DONE and the judge says PASS.
 After a FAIL, send the work back or tell the owner what failed.
@@ -133,6 +136,12 @@ Add two lines below the stored handoff. Do not change the worker's text.
 ```
 JUDGE     <PASS, FAIL or none> | <the judge> | <repo@sha or none> | <what the judge found, or —>
 ACCEPTED  <yes or no> | <date> | <the reason, when no>
+```
+
+For a judge at another provider, add the line that the skill prints.
+
+```
+execution  <provider> | <model requested> | <effort requested> | <transport> | <run id or none>
 ```
 
 ## LOG: something that outlives the session changed

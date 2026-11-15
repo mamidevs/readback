@@ -1,6 +1,6 @@
 ---
 name: explorer
-description: Read-only exploration. Answers how something works, where it is, and what a change touches, with evidence. Returns a HANDOFF in Readback Protocol v0.3.
+description: Read-only exploration. Answers how something works, where it is, and what a change touches, with evidence. Returns a HANDOFF in Readback Protocol v0.4.
 tools: Read, Grep, Glob, Bash
 disallowedTools: Write, Edit, NotebookEdit, Agent
 model: haiku
