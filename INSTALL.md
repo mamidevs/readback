@@ -52,10 +52,10 @@ The three agents are `readback:explorer`, `readback:worker` and `readback:judge`
 This step needs the `codex` command and its login.
 
 ```
-cp TEAMMATES.example.md ~/logbook/TEAMMATES.md
+printf 'judge | codex | gpt-6-astra | high\n' > ~/logbook/TEAMMATES.md
 ```
 
-Edit the model and the effort in the `judge` row.
+Edit the model and the effort in the row.
 The other provider then sees the contract, the handoff and the repository folder of each judged task.
 Remove the file to turn it off.
 
@@ -87,6 +87,25 @@ claude plugin marketplace remove readback
 
 `~/logbook` stays. Delete it yourself if you want to.
 
+## OpenAI Codex
+
+Codex has no output style and no plugin from this repository. It reads Agent Skills and `AGENTS.md`.
+
+```
+git clone https://github.com/mamidevs/readback
+mkdir -p ~/.agents/skills ~/logbook
+cp -R readback/portable/skills/* ~/.agents/skills/
+printf '\nFor every task, and when I ask to continue earlier work, load the skill `readback` and follow it.\n' >> ~/.codex/AGENTS.md
+```
+
+The copy adds four folders: `readback`, `readback-worker`, `readback-explorer` and `readback-judge`.
+The line in `AGENTS.md` applies to every Codex session. It loads the lead rules for a task, not for a plain question.
+
+Check: ask Codex for a small change. The answer ends in a brief of four fields, and `~/logbook/<project>/` holds `LOG.md` and `CURRENT.md`.
+
+Update: pull the repository and copy the four folders again.
+Remove: delete the four folders from `~/.agents/skills/` and the line from `~/.codex/AGENTS.md`.
+
 ## Other CLIs
 
-No package exists for Codex or other CLIs.
+No package exists for other CLIs. A CLI that reads Agent Skills can try `portable/skills/`. Nothing checks it.

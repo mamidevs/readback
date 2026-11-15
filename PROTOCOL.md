@@ -1,8 +1,8 @@
-# Readback Protocol v0.4
+# Readback Protocol v0.5
 
 Status: approved. DEC-20261115-01, the owner said "go" on 2026-11-15.
-This text includes Amendment 01 (DEC-20261115-04), Amendment 02 (DEC-20261115-07), Amendment 03 (DEC-20261115-12), Amendment 04 (DEC-20261115-15) and Amendment 05 (DEC-20261116-01).
-Amendment 03 changed the meaning of two fixed words. Amendment 04 changed the DEC line. Amendment 05 added teammates at other providers. Each change gave the text a new number.
+This text includes Amendment 01 (DEC-20261115-04), Amendment 02 (DEC-20261115-07), Amendment 03 (DEC-20261115-12), Amendment 04 (DEC-20261115-15), Amendment 05 (DEC-20261116-01) and Amendment 06 (DEC-20261116-04, DEC-20261116-05).
+Amendment 03 changed the meaning of two fixed words. Amendment 04 changed the DEC line. Amendment 05 added teammates at other providers. Amendment 06 added the rule about the memory of the host. Each change gave the text a new number.
 
 One format for what the lead says and what it records.
 The owner reads less. A message that leaves items out says how many and where they are.
@@ -242,6 +242,7 @@ NEXT      <one step>
 - CURRENT.md has at most 30 lines. It names records by id. It does not copy them.
 - CURRENT.md is a summary. If it disagrees with a record, the record wins.
 - Do not write a secret in CURRENT.md.
+- The records hold the state of the work. Do not write it to the memory of the host CLI.
 
 When the owner asks to continue earlier work, do these steps before the work.
 

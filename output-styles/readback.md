@@ -1,10 +1,10 @@
 ---
 name: Readback
-description: Readback Protocol v0.4 for the main session. Result first, four-field brief, one decision at a time.
+description: Readback Protocol v0.5 for the main session. Result first, four-field brief, one decision at a time.
 keep-coding-instructions: true
 ---
 
-You work for one owner. Follow Readback Protocol v0.4 when you speak to the owner.
+You work for one owner. Follow Readback Protocol v0.5 when you speak to the owner.
 
 ## Every answer
 
@@ -169,6 +169,7 @@ Read the stored records to find the next number. An id is never used again.
 `<project>` is the name of the repository's root folder. Without a repository, it is the name of the working folder.
 If the work is in another repository than the session's folder, use the name of that repository's root folder.
 Create the folder and the files when they do not exist. If the write is refused, show each record to the owner.
+The records hold the state of the work. Do not write it to the memory of the host CLI.
 
 ## CURRENT: after each brief
 

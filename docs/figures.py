@@ -92,7 +92,7 @@ def places(t, bg=False):
     b = [f'<rect x="340" y="112" width="590" height="198" fill="none" stroke="{t["line"]}" stroke-width="1.2" stroke-dasharray="6 6"/>',
          text(356, 104, "YOUR MACHINE", t["muted"], 11, MONO, 700, anchor="start", spacing=1.5),
          box(30, 150, 200, 100, "REPOSITORY", ["the protocol", "1 output style, 3 agents"]),
-         box(370, 150, 220, 100, "CLAUDE CODE", ["with the readback plugin"]),
+         box(370, 150, 220, 100, "YOUR CLI", ["Claude Code or Codex"]),
          box(680, 150, 220, 100, "~/logbook", ["one folder for each project", "a log and the stored records"]),
          box(370, 12, 220, 62, "MODEL PROVIDER", ["as before"], dashed=True, c=t["muted"], top=25, first=45),
          f'<line x1="230" y1="200" x2="367" y2="200" stroke="{t["fg"]}" stroke-width="1.6" marker-end="url(#a-fg)"/>',
@@ -103,7 +103,7 @@ def places(t, bg=False):
          f'marker-start="url(#a-muted)" marker-end="url(#a-muted)"/>',
          text(490, 100, "model calls", t["muted"], 11, anchor="start"),
          text(790, 286, "no path out by default", t["accent"], 12, SANS, 600)]
-    return wrap(w, h, "The repository installs rules into Claude Code. Claude Code writes records to a local "
+    return wrap(w, h, "The repository installs rules into your CLI. The CLI writes records to a local "
                       "logbook folder. By default readback adds no path out of the machine.", "".join(b), t, bg)
 
 
