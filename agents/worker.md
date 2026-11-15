@@ -1,6 +1,6 @@
 ---
 name: worker
-description: Does one bounded task that changes files and returns a HANDOFF in Readback Protocol v0.2. Use it for each independent piece of work.
+description: Does one bounded task that changes files and returns a HANDOFF in Readback Protocol v0.3. Use it for each independent piece of work.
 tools: Read, Grep, Glob, Bash, Write, Edit
 disallowedTools: Agent, NotebookEdit
 model: sonnet

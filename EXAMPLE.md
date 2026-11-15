@@ -16,7 +16,7 @@ GO olursa      Sözleşmeyi yazar, işçiyi başlatırım.
 The owner answers: "GO, 5 deneme olsun".
 
 ```
-DEC-20261115-01 | shop-api | Rate limit in the app | "GO, 5 deneme olsun" | 2026-11-15
+DEC-20261115-01 | shop-api | Rate limit in the app | "GO, 5 deneme olsun" | 2026-11-15 | standing | -
 ```
 
 ## 2. CONTRACT (lead to worker)
@@ -60,6 +60,12 @@ PASS  The diff and the test output support ACC-1 and ACC-2. ACC-3 is correctly U
 ```
 
 PASS is about the handoff. The state is PARTIAL, so the lead tells the owner what remains.
+The lead adds two lines below the stored handoff.
+
+```
+JUDGE     PASS | judge | shop-api@4f2a91c | —
+ACCEPTED  no | 2026-11-15 | The state is PARTIAL. ACC-3 is UNVERIFIED.
+```
 
 ## 5. LOG (lead to record)
 
@@ -85,4 +91,35 @@ NEEDS YOU  Should the proxy set the client IP? Today a client can change one hea
 KNOW       No test covers a limiter store that is down (UNVERIFIED).
 OPEN       The test that allows the login when the store is down.
 Next:      Decide the client IP question. Then I start the missing test.
+```
+
+## 7. CURRENT (lead to record)
+
+The lead writes `CURRENT.md` after the brief.
+
+```
+CURRENT   shop-api
+updated   2026-11-15 | after LOG-20261115-01
+GOAL      Stop password guessing on the login endpoint.
+IN FORCE  DEC-20261115-01 rate limit in the app, 5 tries
+OPEN      The owner decides if the proxy sets the client IP. (owner)
+          The limiter-down test, ACC-3 of CON-20261115-01. See HND-20261115-01.
+NEXT      Ask the owner the client IP question.
+```
+
+## 8. The next session
+
+The owner starts a new session and writes: "kaldığımız yerden devam et".
+The lead reads `CURRENT.md`, the newer LOG lines, `HND-20261115-01` and the state of the repository. Then it answers.
+
+```
+Amaç: login'de parola denemelerini sınırlamak. Limit uygulamada, 5 deneme (DEC-20261115-01).
+Açık: istemci IP'sini proxy mi belirlesin, kararı sende. Limit deposu çökünce çalışan test yazılmadı.
+Sonraki adım: IP kararını ver; ardından eksik testi yazdırırım.
+```
+
+The owner answers: "proxy belirlesin".
+
+```
+DEC-20261116-01 | shop-api | The proxy sets the client IP. | "proxy belirlesin" | 2026-11-16 | standing | -
 ```

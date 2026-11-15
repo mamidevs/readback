@@ -1,8 +1,8 @@
-# Readback Protocol v0.2
+# Readback Protocol v0.3
 
 Status: approved. DEC-20261115-01, the owner said "go" on 2026-11-15.
-This text includes Amendment 01 (DEC-20261115-04), Amendment 02 (DEC-20261115-07) and Amendment 03 (DEC-20261115-12).
-Amendment 03 changed the meaning of two fixed words and added one. That change made this text v0.2.
+This text includes Amendment 01 (DEC-20261115-04), Amendment 02 (DEC-20261115-07), Amendment 03 (DEC-20261115-12) and Amendment 04 (DEC-20261115-15).
+Amendment 03 changed the meaning of two fixed words. Amendment 04 changed the DEC line. Each change gave the text a new number.
 
 One format for what the lead says and what it records.
 The owner reads less. A message that leaves items out says how many and where they are.
@@ -81,8 +81,17 @@ IF GO      <the first action>
 Record the answer as `DEC-<YYYYMMDD>-<NN>` with the owner's exact words and the date.
 
 ```
-DEC-<YYYYMMDD>-<NN> | <project> | <what was decided> | "<owner's exact words>" | <date>
+DEC-<YYYYMMDD>-<NN> | <project> | <what was decided> | "<owner's exact words>" | <date> | <kind> | <supersedes>
 ```
+
+- kind: `once` or `standing`
+- `once`: the owner approved one action. The approval ends when the action ran or the session ends.
+- `standing`: the owner decided how something is or how to work. It stays in force until a later DEC supersedes it.
+- A `standing` decision is not an approval for a later action. An action that needs approval needs its own GO.
+- If you cannot tell the kind, write `once` and ask the owner.
+- supersedes: the id of the DEC that this decision replaces, or `-`. Do not edit the old line.
+- A DEC line without a kind is from an older version. It approves no action now.
+- A DEC records what the owner said. Do not record a guess about what the owner wants.
 
 Labels in other languages map one to one. Turkish: Karar, Öneri, Bedel, Diğer seçenek, GO olursa.
 
@@ -197,6 +206,14 @@ A handoff that reports FAILED or UNVERIFIED with evidence can get PASS.
 The lead accepts the work when the state is DONE and the judge says PASS.
 After a FAIL, the lead sends the work back or tells the owner what failed.
 If the state is not DONE, the lead tells the owner what remains.
+Before the lead accepts, it reads the owner's request again. If the contract missed a part of the request, the lead tells the owner.
+
+The lead adds two lines below the stored handoff. It does not change the worker's text.
+
+```
+JUDGE     <PASS, FAIL or none> | <the judge> | <repo@sha or none> | <what the judge found, or —>
+ACCEPTED  <yes or no> | <date> | <the reason, when no>
+```
 
 ## 5. Trace
 
@@ -205,3 +222,37 @@ If the state is not DONE, the lead tells the owner what remains.
 - Each DEC record quotes the owner. It does not translate the quote.
 - The lead stores each CONTRACT and each HANDOFF in the place for records. One record is one file. The file name is the id.
 - A `ref` points to something that the reader can open.
+- Each stored handoff carries the judge's answer and the lead's acceptance.
+
+## 6. Resume
+
+A new session does not know the last one. The records carry the work.
+The lead keeps one file for each project in the place for records: `CURRENT.md`.
+
+```
+CURRENT   <project>
+updated   <YYYY-MM-DD> | after <the last LOG or DEC id that this file covers>
+GOAL      <what the owner wants from this project now>
+IN FORCE  <each standing decision that matters now: the DEC id and 3 to 8 words>
+OPEN      <the work that remains and the asks that wait for the owner>
+NEXT      <one step>
+```
+
+- Write CURRENT.md again after each BRIEF. Replace the old text. The LOG stays add-only.
+- CURRENT.md has at most 30 lines. It names records by id. It does not copy them.
+- CURRENT.md is a summary. If it disagrees with a record, the record wins.
+- Do not write a secret in CURRENT.md.
+
+When the owner asks to continue earlier work, do these steps before the work.
+
+1. Read CURRENT.md.
+2. Read the LOG and DEC lines that are newer than the id in `updated`.
+3. Read the stored handoff that an open item names.
+4. Compare with the repository: the branch, the last commit and the changes that are not committed.
+5. Tell the owner the goal, the open work and the next step in at most 3 lines.
+
+- Start the next step only if it needs no answer from the owner.
+- If the records and the repository disagree, the repository wins. Tell the owner what differs.
+- A `once` decision from an earlier session approves nothing now. Ask again.
+- If no CURRENT.md exists, say so. Read the last 20 lines of the LOG.
+- If the owner does not name the project, use the project of the session's folder. If it has no records, ask which project.

@@ -14,7 +14,7 @@ readback gives each message to the owner a fixed shape, and it makes each claim 
 
 *One task with a confirmed readback. Three messages are addressed to the owner. The logbook gets the records.*
 
-## Four rules carry the design
+## Five rules carry the design
 
 | Rule | In the protocol |
 |---|---|
@@ -22,6 +22,7 @@ readback gives each message to the owner a fixed shape, and it makes each claim 
 | Approval is for one decision. | Only the owner says GO. A GO does not carry to the next decision. |
 | Unverified and failed are statuses. | A check that did not run gives UNVERIFIED. A check that failed gives FAILED. Neither gives DONE. |
 | The author does not grade the work. | A different agent judges each handoff. |
+| The records carry the work. | The lead keeps one short `CURRENT.md` for each project. A new session reads it before it continues. |
 
 ## Install
 
@@ -88,7 +89,7 @@ Eleven words have one fixed meaning each.
 *readback adds one path in and one path down. It adds none out.*
 
 - The repository holds rules: the protocol, one output style and three agents.
-- `~/logbook` holds your records: one folder for each project. `LOG.md` has one line for each change and each decision. `records/` has one file for each contract and each handoff.
+- `~/logbook` holds your records: one folder for each project. `LOG.md` has one line for each change and each decision. `records/` has one file for each contract and each handoff. `CURRENT.md` is the short summary that a new session reads first.
 - readback has no server, no hook and no upload.
 - The model that writes a record has read it, as it reads the rest of your session.
 
@@ -115,11 +116,15 @@ claude plugin eval . --trust-plugin --scaffold --allow-tools Bash Write Edit --a
 - Each case runs 3 times. Pass `--runs 1` for a short run.
 - The runs need Claude Code 2.1.269 or later. They use your account and cost model calls.
 
+`checks/resume.sh` tests the resume rule with two real sessions and your own settings.
+The first session leaves an open task that no file shows. The second session must find it in `CURRENT.md`.
+The script writes a test folder in `~/logbook`. Read the script first.
+
 ## Limits
 
 - The style and the agents are instructions. They are not enforcement. Set hard limits in the permission and sandbox settings of your CLI.
 - By default the readback arrives with the handoff. It shows a wrong start after the work. Only the confirmed readback stops a wrong start.
-- The evals do not test the output style. `claude plugin eval` has no documented way to select one.
+- The evals do not test the output style. `claude plugin eval` has no documented way to select one. Only `checks/resume.sh` runs the style.
 - readback runs on Claude Code. No package exists for other CLIs.
 - No task tracker integration ships.
 
@@ -141,13 +146,15 @@ The capital word READBACK in the protocol is that step. The lowercase name `read
 
 | File | Content |
 |---|---|
-| [PROTOCOL.md](PROTOCOL.md) | The standard, v0.2 |
+| [PROTOCOL.md](PROTOCOL.md) | The standard, v0.3 |
 | [EXAMPLE.md](EXAMPLE.md) | One task with all five message types |
 | [INSTALL.md](INSTALL.md) | Install, check, update, remove |
 | [AMENDMENT-01.md](AMENDMENT-01.md) | The first amendment and its reasons |
 | [AMENDMENT-02.md](AMENDMENT-02.md) | The second amendment and its reasons |
 | [AMENDMENT-03.md](AMENDMENT-03.md) | The third amendment and its reasons |
+| [AMENDMENT-04.md](AMENDMENT-04.md) | The fourth amendment and its reasons |
 | `output-styles/`, `agents/` | The Claude Code plugin |
 | `evals/` | Six eval cases for `claude plugin eval` |
+| `checks/resume.sh` | A two-session check of the resume rule |
 | `docs/figures.py` | Writes the two figures |
 | [LICENSE](LICENSE) | MIT |

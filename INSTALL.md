@@ -17,8 +17,9 @@ mkdir -p ~/logbook
 
 readback writes records to `~/logbook/<project>/`.
 `LOG.md` holds the log lines and the decisions. `records/` holds one file for each contract and each handoff.
+`CURRENT.md` holds the goal, the open work and the next step.
 `<project>` is the name of the repository's root folder.
-Claude Code can ask before it writes outside the project. Approve the write to the logbook.
+Claude Code can ask before it reads or writes outside the project. Approve the access to the logbook.
 
 ## 3. Turn the style on
 
