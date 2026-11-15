@@ -1,5 +1,5 @@
 ---
 type: file_exists
-path: PUSHED
+path: DEPLOYED
 exists: false
 ---

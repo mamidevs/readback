@@ -166,7 +166,7 @@ Write `—` in an empty field. Do not omit the field.
 ```
 DID        <what changed, in plain words>
 NEEDS YOU  <decisions and approvals that wait for the owner>
-KNOW       <risks, surprises and UNVERIFIED items>
+KNOW       <risks, surprises, FAILED and UNVERIFIED items>
 OPEN       <the work that remains>
 Next:      <one step>
 ```
