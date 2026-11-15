@@ -59,7 +59,7 @@ def flow(t, bg=False):
         (480, 290, "HANDOFF", "state, changes, checks", "fg", None),
         (290, 670, "handoff + contract", "sent for judgment", "fg", 385),
         (670, 290, "PASS / FAIL", "the first word", "fg", 575),
-        (290, 860, "LOG", "one line for each change", "fg", 385),
+        (290, 860, "LOG", "and the stored records", "fg", 385),
         (290, 100, "BRIEF", "four fields, one next step", "accent", None),
     ]
     y = 112
@@ -93,7 +93,7 @@ def places(t, bg=False):
          text(356, 104, "YOUR MACHINE", t["muted"], 11, MONO, 700, anchor="start", spacing=1.5),
          box(30, 150, 200, 100, "REPOSITORY", ["the protocol", "1 output style, 3 agents"]),
          box(370, 150, 220, 100, "CLAUDE CODE", ["with the readback plugin"]),
-         box(680, 150, 220, 100, "~/logbook", ["one folder for each project", "one line for each change"]),
+         box(680, 150, 220, 100, "~/logbook", ["one folder for each project", "a log and the stored records"]),
          box(370, 12, 220, 62, "MODEL PROVIDER", ["as before"], dashed=True, c=t["muted"], top=25, first=45),
          f'<line x1="230" y1="200" x2="367" y2="200" stroke="{t["fg"]}" stroke-width="1.6" marker-end="url(#a-fg)"/>',
          text(282, 190, "install, update", t["fg"], 11),

@@ -1,10 +1,11 @@
-# Readback Protocol v0.1
+# Readback Protocol v0.2
 
 Status: approved. DEC-20261115-01, the owner said "go" on 2026-11-15.
-This text includes Amendment 01 (DEC-20261115-04) and Amendment 02 (DEC-20261115-07).
+This text includes Amendment 01 (DEC-20261115-04), Amendment 02 (DEC-20261115-07) and Amendment 03 (DEC-20261115-12).
+Amendment 03 changed the meaning of two fixed words and added one. That change made this text v0.2.
 
-One format for what the harness says and what it records.
-The owner reads less and misses nothing.
+One format for what the lead says and what it records.
+The owner reads less. A message that leaves items out says how many and where they are.
 
 Adapted from ideas in ASD-STE100, EARS, ICAO radiotelephony, S1000D and DO-178C.
 It does not conform to any of them.
@@ -21,6 +22,10 @@ It does not conform to any of them.
 | R6 | Write records in English. An instruction has at most 20 words. A description has at most 25. | LOG, CONTRACT, HANDOFF, DEC |
 | R7 | Speak to the owner in the owner's language. A field has at most 2 lines. A list has at most 5 items. | BRIEF, DECISION |
 | R8 | Do not translate fixed words, ids, code or commands. | all messages |
+| R9 | Do not write a secret. Write `<secret>` in its place. This rule wins over R5 and over an exact quote. | all messages |
+| R10 | When a limit cuts items, put first the items that need the owner. Write how many remain and where they are. | BRIEF, DECISION |
+
+A secret is a password, a token, a key or a connection string.
 
 ## 2. Fixed words
 
@@ -30,14 +35,18 @@ It does not conform to any of them.
 | PARTIAL | worker | Some contract statements are not VERIFIED. The handoff names them. |
 | BLOCKED | worker | The work cannot continue without something external. The handoff names it. |
 | UNABLE | worker | The worker cannot or must not do the task as asked. The handoff gives the reason. |
-| VERIFIED | worker, judge | A check ran in this session. The message shows the result. |
-| UNVERIFIED | worker, judge | No check ran. The message says why. |
+| VERIFIED | worker, judge | A check ran in this session, after the last change. Its result shows that the statement is true. |
+| FAILED | worker, judge | A check ran in this session, after the last change. Its result shows that the statement is not true. |
+| UNVERIFIED | worker, judge | No check ran, or a change came after the check. The message says why. |
 | PASS | judge | The evidence supports every claim in the handoff. |
 | FAIL | judge | A claim has no evidence, or the handoff hides a failure. |
 | GO | owner | The owner approves this one decision. |
 | NO-GO | owner | The owner rejects this one decision. |
 
 - A check that did not run gives UNVERIFIED. It never gives DONE.
+- A check that ran and failed gives FAILED. It never gives VERIFIED.
+- A change after a check makes the result old. An old result gives UNVERIFIED.
+- VERIFIED and FAILED show the command, the exit code and the result.
 - Only the owner says GO or NO-GO.
 - A GO covers one decision. It does not carry to the next decision.
 - Number the open asks. A bare GO answers number 1 only.
@@ -54,6 +63,7 @@ It does not conform to any of them.
 | BRIEF | lead to owner | A task that changed something ends. |
 
 Each record has an id: `<TYPE>-<YYYYMMDD>-<NN>`. The types are DEC, CON, HND and LOG. An id is never used again.
+Read the stored records to find the next number.
 
 ### 3.1 DECISION
 
@@ -94,14 +104,18 @@ A change to the scope that the owner approved needs a GO.
 
 ### 3.3 HANDOFF
 
-The worker reads the task back before it starts.
+The worker reads the task back.
 
 ```
 READBACK  task: <what I will do> | limits: <what I must not change> | done when: <ACC ids>
 ```
 
-The lead corrects a wrong readback.
-If the host cannot carry a reply, the worker writes the readback in the `readback` key of the handoff.
+The readback has two forms.
+
+- Recorded readback. The worker writes the readback in the `readback` key of the handoff. The lead compares it with the contract before it accepts the work. This form finds a wrong start after the work.
+- Confirmed readback. The lead asks for the readback only. The worker returns the readback and changes no file. The lead corrects it, then starts the work. This form stops a wrong start.
+
+The recorded readback is the default. Use the confirmed readback when a wrong start is hard to undo.
 Without a contract, write `done when:` in plain words and `contract: none`.
 If the task needs an action that needs approval, the worker stops. It returns BLOCKED and names the action.
 
@@ -116,8 +130,8 @@ The handoff has these keys in this order. Use JSON with the same keys when a scr
 | summary | 1 to 3 sentences |
 | changes | Each file and what changed in it |
 | commit | `repo@sha` or `none` |
-| checks | Command, exit code, observation. Use no pipe that hides the exit code. |
-| contract | Each ACC id with VERIFIED or UNVERIFIED |
+| checks | Command, exit code, observation. Run each check after the last change. Use no pipe that hides the exit code. |
+| contract | Each ACC id with VERIFIED, FAILED or UNVERIFIED |
 | open | The work that remains and why, or `—` |
 | issues | Severity (blocking, high, low) and description. Action items only. |
 | next | The first step for the receiver |
@@ -136,6 +150,7 @@ LOG-<YYYYMMDD>-<NN> | <project> | <target> | <what changed> | <why> | <go> | <re
 - target: `code:<repo>@<sha>`, `server:<host>`, `db:<name>`, `config:<path>` or `doc:<path>`
 - go: the DEC id and the owner's exact words. Write `-` when the change needed no approval.
 - ref: the commit, the HND id or the check that proves the change
+- Cite an HND id only when the lead stored that handoff.
 - Write `doc:<path>` when no commit exists.
 - When two projects have the same name, write `<parent folder>-<project>`.
 
@@ -158,23 +173,35 @@ Next:      <one step>
 
 - Quote the owner's decisions in the owner's words.
 - Mark a decision that the agent made with `[agent decision]`.
+- If a field has more items than fit, write how many remain and where they are. Example: `+3 more in HND-20261115-02`.
+- When a worker did the work and no judge ran, say so in KNOW.
 - Labels in other languages map one to one. Turkish: Yapılan, Senden beklenen, Bilmen gereken, Yapılmayan, Sonraki adım.
 
 ## 4. Independence
 
 The agent that did the work does not judge it.
 The judge is a different agent. Use a different provider if possible.
-The judge checks three things:
+The judge checks four things:
 
 1. The evidence supports each claim.
 2. The handoff hides no failure.
 3. Each contract statement has a status.
+4. Each VERIFIED status has a check that ran after the last change. Run the check again when you can.
 
 The first word of the judge's answer is PASS or FAIL.
 After the first word, name each claim that has no evidence and each failure that the handoff hides.
+
+PASS is about the handoff. It does not say that the task is complete.
+A handoff that reports FAILED or UNVERIFIED with evidence can get PASS.
+
+The lead accepts the work when the state is DONE and the judge says PASS.
+After a FAIL, the lead sends the work back or tells the owner what failed.
+If the state is not DONE, the lead tells the owner what remains.
 
 ## 5. Trace
 
 - Each LOG line cites its approval in `go` and its proof in `ref`.
 - Each ACC statement has a status in the `contract` key of a HANDOFF.
 - Each DEC record quotes the owner. It does not translate the quote.
+- The lead stores each CONTRACT and each HANDOFF in the place for records. One record is one file. The file name is the id.
+- A `ref` points to something that the reader can open.

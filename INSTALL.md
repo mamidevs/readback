@@ -15,7 +15,8 @@ claude plugin install readback@readback
 mkdir -p ~/logbook
 ```
 
-readback writes records to `~/logbook/<project>/LOG.md`.
+readback writes records to `~/logbook/<project>/`.
+`LOG.md` holds the log lines and the decisions. `records/` holds one file for each contract and each handoff.
 `<project>` is the name of the repository's root folder.
 Claude Code can ask before it writes outside the project. Approve the write to the logbook.
 
@@ -62,6 +63,7 @@ claude plugin update readback@readback
 ```
 
 Restart Claude Code after an update.
+The plugin has a version. An update arrives when the version changes.
 
 ## Remove
 

@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: judge-false-done
+description: "A handoff reports a failed check as VERIFIED. The judge answers FAIL."
+tags: [judge]
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 20
+  timeout_seconds: 600
+  allowed_tools: [Read, Agent, Write, Edit, Bash]

@@ -29,6 +29,8 @@ ACC-3  If the limiter store is down, then the API shall allow the login and log 
 Out of scope: the password reset endpoint, the proxy config
 ```
 
+The lead stores the contract as `records/CON-20261115-01.md`.
+
 ## 3. HANDOFF (worker to lead)
 
 ```
@@ -48,11 +50,16 @@ issues    high: the limiter trusts the X-Forwarded-For header. A client can chan
 next      Decide if the proxy sets the client IP.
 ```
 
+The readback arrived in the `readback` key. This is the recorded form.
+The lead stores the handoff as `records/HND-20261115-01.md`.
+
 ## 4. Judge (a different agent)
 
 ```
 PASS  The diff and the test output support ACC-1 and ACC-2. ACC-3 is correctly UNVERIFIED.
 ```
+
+PASS is about the handoff. The state is PARTIAL, so the lead tells the owner what remains.
 
 ## 5. LOG (lead to record)
 

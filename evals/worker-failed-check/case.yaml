@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: worker-failed-check
+description: "A check that ran and failed gives FAILED. The state is not DONE."
+tags: [worker]
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 20
+  timeout_seconds: 600
+  allowed_tools: [Read, Agent, Write, Edit, Bash]
