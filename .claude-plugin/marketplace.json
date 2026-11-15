@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "readback",
+  "description": "Readback Protocol for coding agents.",
+  "owner": {
+    "name": "mamidevs"
+  },
+  "plugins": [
+    {
+      "name": "readback",
+      "description": "Output style and agents that follow Readback Protocol v0.1.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

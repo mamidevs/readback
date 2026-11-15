@@ -1,0 +1,11 @@
+{
+  "name": "readback",
+  "displayName": "Readback",
+  "description": "One format for what a coding agent says and records: result first, four-field brief, GO/NO-GO decisions, contracts, handoffs and an independent judge.",
+  "author": {
+    "name": "mamidevs"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/mamidevs/readback",
+  "repository": "https://github.com/mamidevs/readback"
+}
