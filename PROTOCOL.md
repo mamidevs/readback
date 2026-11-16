@@ -1,8 +1,8 @@
-# Readback Protocol v0.5
+# Readback Protocol v0.6
 
 Status: approved. DEC-20261115-01, the owner said "go" on 2026-11-15.
-This text includes Amendment 01 (DEC-20261115-04), Amendment 02 (DEC-20261115-07), Amendment 03 (DEC-20261115-12), Amendment 04 (DEC-20261115-15), Amendment 05 (DEC-20261116-01) and Amendment 06 (DEC-20261116-04, DEC-20261116-05).
-Amendment 03 changed the meaning of two fixed words. Amendment 04 changed the DEC line. Amendment 05 added teammates at other providers. Amendment 06 added the rule about the memory of the host. Each change gave the text a new number.
+This text includes Amendment 01 (DEC-20261115-04), Amendment 02 (DEC-20261115-07), Amendment 03 (DEC-20261115-12), Amendment 04 (DEC-20261115-15), Amendment 05 (DEC-20261116-01), Amendment 06 (DEC-20261116-04, DEC-20261116-05) and Amendment 07 (DEC-20261116-07).
+Amendment 03 changed the meaning of two fixed words. Amendment 04 changed the DEC line. Amendment 05 added teammates at other providers. Amendment 06 added the rule about the memory of the host. Amendment 07 made opposite-provider judging automatic. Each change gave the text a new number.
 
 One format for what the lead says and what it records.
 The owner reads less. A message that leaves items out says how many and where they are.
@@ -190,6 +190,17 @@ Next:      <one step>
 
 The agent that did the work does not judge it.
 The judge is a different agent. Use a different provider if possible.
+The supported lead integrations select the other provider automatically:
+
+| Lead | Judge | Default model | Effort |
+|---|---|---|---|
+| Codex | Claude Code | `fable` | high |
+| Claude Code | Codex | `gpt-6-astra` | high |
+
+No teammates table is required. The lead names its host when it calls the helper.
+An unavailable provider gives `JUDGE none`. Do not substitute a local judge or another model.
+The judge does not delegate or start another judge.
+
 The judge checks four things:
 
 1. The evidence supports each claim.
@@ -214,6 +225,12 @@ The lead adds two lines below the stored handoff. It does not change the worker'
 JUDGE     <PASS, FAIL or none> | <the judge> | <repo@sha or none> | <what the judge found, or —>
 ACCEPTED  <yes or no> | <date> | <the reason, when no>
 ```
+
+For an outside judge, store the complete helper output before ACCEPTED, including the execution line and the full answer.
+The output records the provider, requested model, reported model when available, requested effort and execution method.
+Claude Fable receives only Read, Grep and Glob tools. It cannot rerun shell checks.
+Codex runs with its read-only sandbox. CLI settings and managed policies remain part of the trust boundary.
+A commit label does not identify uncommitted changes in the reviewed checkout.
 
 ## 5. Trace
 
@@ -262,7 +279,8 @@ When the owner asks to continue earlier work, do these steps before the work.
 
 A teammate can run at another provider than the lead. Sections 2 to 6 stay the same for that teammate.
 
-- Use a teammate at another provider only when the owner's local table names it.
+- Judges follow the automatic routing in section 4. Their local table is optional.
+- Other roles use another provider only when the owner's local table names it.
 - The lead gives out the record ids before it delegates. Only the lead writes records.
 - A change of provider does not change the contract, the checks, the approvals or the permissions.
 - A teammate gets only the context that its contract needs.

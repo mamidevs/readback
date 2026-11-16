@@ -1,12 +1,12 @@
 ---
 name: outside-judge
-description: Sends a HANDOFF and its CONTRACT to a judge at another provider and returns PASS, FAIL or no verdict. Use it after a worker stops, when ~/logbook/TEAMMATES.md names a judge.
+description: Sends a HANDOFF and its CONTRACT from Claude Code to a Codex judge automatically. Returns PASS, FAIL or no verdict.
 ---
 
 # Outside judge
 
-Use this skill only when `~/logbook/TEAMMATES.md` has a `judge` row.
-Without that file or that row, use the judge agent of this host.
+Use this skill after a worker stops. Claude Code selects Codex automatically.
+The default judge is `gpt-6-astra` at `high` effort. No teammates table is required.
 
 The other provider sees the contract, the handoff and the repository folder.
 
@@ -16,22 +16,22 @@ The other provider sees the contract, the handoff and the repository folder.
 2. Run this command. Do not change it.
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/outside-judge.sh" <contract file> <handoff file> <repository folder>
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/outside-judge.sh" --host claude <contract file> <handoff file> <repository folder>
 ```
 
-3. Read the first two lines of the output.
+3. Read the complete output. Its first two lines identify the verdict and execution.
 
 ```
 JUDGE      <PASS, FAIL or none> | <provider:model> | <repo@sha or none> | <note>
 execution  <provider> | <model requested> | <effort requested> | cli | none
 ```
 
-4. Add both lines and the ACCEPTED line below the stored handoff. Do not change the worker's text.
+4. Store the complete output below the handoff, including the judge's reasoning. Then add ACCEPTED. Do not change the worker's text.
 
 ## Rules
 
-- Exit code 2 means that no outside judge is named. Use the judge agent of this host.
 - Exit code 3 means that the call gave no verdict. Write `JUDGE none`. Do not accept the work. Tell the owner.
+- Missing tools, invalid configuration and a missed deadline give no verdict. Do not substitute a local judge.
 - A FAIL never sends the handoff to another judge.
 - Do not run the command again with another model.
 - The first word of the judge's answer is the verdict. Words in the rest of the answer do not change it.

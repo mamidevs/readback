@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "readback",
-      "description": "Output style and agents that follow Readback Protocol v0.5.",
+      "description": "Output style and agents that follow Readback Protocol v0.6.",
       "source": "./",
       "category": "productivity"
     }

@@ -47,17 +47,28 @@ For every project, set this key in `~/.claude/settings.json`:
 
 The three agents are `readback:explorer`, `readback:worker` and `readback:judge`.
 
-## A judge at another provider (optional)
+## Automatic outside judge
 
-This step needs the `codex` command and its login.
+Install Python 3 and both provider CLIs. Log in to each CLI before the first judged task.
+Claude Code leads use Codex with `gpt-6-astra` at high effort.
+Codex leads use Claude Code with `fable` at high effort.
+The integrations pass their host automatically. No `TEAMMATES.md` file is required.
 
+The other provider receives the contract and handoff, and its CLI can read repository files.
+The lead stores the full judgment. Failed calls give `JUDGE none` and leave the work unaccepted.
+There is no silent local or model fallback.
+[TEAMMATES.example.md](TEAMMATES.example.md) describes optional overrides and legacy table compatibility.
+Removing an override file restores the defaults; it does not disable the judge.
+
+Offline routing checks and optional live checks:
+
+```bash
+python3 -m unittest discover -s checks -p 'test_outside_judge.py' -v
+bash checks/outside-judge.sh codex
+bash checks/outside-judge.sh claude
 ```
-printf 'judge | codex | gpt-6-astra | high\n' > ~/logbook/TEAMMATES.md
-```
 
-Edit the model and the effort in the row.
-The other provider then sees the contract, the handoff and the repository folder of each judged task.
-Remove the file to turn it off.
+The last two commands use your provider accounts and consume model calls.
 
 ## Try it without an install
 
@@ -99,6 +110,7 @@ printf '\nFor every task, and when I ask to continue earlier work, load the skil
 ```
 
 The copy adds four folders: `readback`, `readback-worker`, `readback-explorer` and `readback-judge`.
+The lead folder includes the outside-judge helper and its judge rules. Keep the complete folder when copying.
 The line in `AGENTS.md` applies to every Codex session. It loads the lead rules for a task, not for a plain question.
 Codex can ask before it writes outside the project. Approve the access to the logbook.
 

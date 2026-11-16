@@ -94,7 +94,7 @@ def places(t, bg=False):
          box(30, 150, 200, 100, "REPOSITORY", ["the protocol", "1 output style, 3 agents"]),
          box(370, 150, 220, 100, "YOUR CLI", ["Claude Code or Codex"]),
          box(680, 150, 220, 100, "~/logbook", ["one folder for each project", "a log and the stored records"]),
-         box(370, 12, 220, 62, "MODEL PROVIDER", ["as before"], dashed=True, c=t["muted"], top=25, first=45),
+         box(370, 12, 220, 62, "MODEL PROVIDERS", ["lead and outside judge"], dashed=True, c=t["muted"], top=25, first=45),
          f'<line x1="230" y1="200" x2="367" y2="200" stroke="{t["fg"]}" stroke-width="1.6" marker-end="url(#a-fg)"/>',
          text(282, 190, "install, update", t["fg"], 11),
          f'<line x1="590" y1="200" x2="677" y2="200" stroke="{t["fg"]}" stroke-width="1.6" marker-end="url(#a-fg)"/>',
@@ -102,9 +102,9 @@ def places(t, bg=False):
          f'<line x1="480" y1="77" x2="480" y2="147" stroke="{t["muted"]}" stroke-width="1.2" stroke-dasharray="4 4" '
          f'marker-start="url(#a-muted)" marker-end="url(#a-muted)"/>',
          text(490, 100, "model calls", t["muted"], 11, anchor="start"),
-         text(790, 286, "no path out by default", t["accent"], 12, SANS, 600)]
+         text(790, 286, "records stay local", t["accent"], 12, SANS, 600)]
     return wrap(w, h, "The repository installs rules into your CLI. The CLI writes records to a local "
-                      "logbook folder. By default readback adds no path out of the machine.", "".join(b), t, bg)
+                      "logbook folder. The lead and the outside judge use their model providers.", "".join(b), t, bg)
 
 
 def main():

@@ -39,6 +39,7 @@ Then turn the style on in a session:
 ```
 
 [INSTALL.md](INSTALL.md) has the checks, the update and the removal.
+Automatic judging needs Python 3, both `claude` and `codex` commands, and a login for each provider.
 
 ### OpenAI Codex
 
@@ -96,30 +97,32 @@ Eleven words have one fixed meaning each.
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/places-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/places-light.svg">
-  <img alt="The repository installs rules into your CLI. The CLI writes records to a local logbook folder. By default readback adds no path out of the machine." src="docs/places-light.svg">
+  <img alt="The repository installs rules into your CLI. Records stay in a local logbook. The lead and the outside judge use their model providers." src="docs/places-light.svg">
 </picture>
 
-*readback adds one path in and one path down. It adds none out unless you name a teammate at another provider.*
+*Records stay in your logbook. Judging sends task context to the other model provider.*
 
 - The repository holds rules: the protocol, one output style, three agents and one skill. `portable/skills/` holds the same rules for a CLI without an output style.
 - `~/logbook` holds your records: one folder for each project. `LOG.md` has one line for each change and each decision. `records/` has one file for each contract and each handoff. `CURRENT.md` is the short summary that a new session reads first.
-- readback has no server, no hook and no upload.
-- A teammate at another provider is off by default. When `~/logbook/TEAMMATES.md` names one, that provider sees the contract, the handoff and the repository folder.
+- readback has no server and installs no hook.
+- The outside judge receives the contract and the handoff. Its CLI can read the repository files for review.
 - The model that writes a record has read it, as it reads the rest of your session.
 
 ## A judge at another provider
 
-The protocol asks for a judge at a different provider when one exists.
-readback can send a handoff to OpenAI Codex through one read-only `codex exec` call.
+The lead selects the judge automatically. No `TEAMMATES.md` file is required.
 
-```
-printf 'judge | codex | gpt-6-astra | high\n' > ~/logbook/TEAMMATES.md
-```
+| Your CLI | Outside judge | Default model | Effort |
+|---|---|---|---|
+| Codex | Claude Code | `fable` | high |
+| Claude Code | Codex | `gpt-6-astra` | high |
 
-- The row names the model and the effort. Edit it for your account. [TEAMMATES.example.md](TEAMMATES.example.md) explains the table.
-- The call has a deadline. A call that fails gives no verdict, and the lead does not accept the work.
+- Each integration passes its host explicitly. Direct helper calls also accept `READBACK_HOST` or one unambiguous CLI session marker.
+- [TEAMMATES.example.md](TEAMMATES.example.md) explains optional model and effort overrides. A Codex lead must retain a Fable judge.
+- The call has a deadline. Missing tools, unavailable models and failed calls give `JUDGE none`; there is no silent fallback.
+- The lead stores the full judgment and execution metadata beside the handoff.
 - A FAIL never sends the handoff to another judge.
-- `checks/outside-judge.sh` runs the two judge fixtures through that call.
+- `checks/test_outside_judge.py` tests routing and failures offline. `checks/outside-judge.sh claude` and `checks/outside-judge.sh codex` run live fixtures.
 
 ## Evals
 
@@ -155,8 +158,10 @@ The script writes a test folder in `~/logbook`. Read the script first.
 - By default the readback arrives with the handoff. It shows a wrong start after the work. Only the confirmed readback stops a wrong start.
 - The evals do not test the output style. `claude plugin eval` has no documented way to select one. Only `checks/resume.sh` runs the style.
 - The lead runs on Claude Code and on OpenAI Codex. In Codex the rules load for a task, not for a plain question.
-- In Codex a judge is a sub-agent with the permissions of the lead. That it changes no file is an instruction there.
-- A judge at another provider works from a Claude Code lead only, through the `codex` command.
+- Claude Fable gets only Read, Grep and Glob tools. It cannot rerun shell checks. Codex uses its read-only sandbox.
+- The provider CLI enforces tool restrictions. Managed settings and CLI runtime writes remain outside readback's control.
+- An execution line records the requested model. Claude's result must also report Fable model usage; Codex model identity is not independently attested.
+- A commit label alone does not identify uncommitted files reviewed by the judge.
 - The rule that keeps the state out of the memory of the CLI is an instruction. The CLI can still write its own memory.
 - No task tracker integration ships.
 
@@ -178,7 +183,7 @@ The capital word READBACK in the protocol is that step. The lowercase name `read
 
 | File | Content |
 |---|---|
-| [PROTOCOL.md](PROTOCOL.md) | The standard, v0.5 |
+| [PROTOCOL.md](PROTOCOL.md) | The standard, v0.6 |
 | [EXAMPLE.md](EXAMPLE.md) | One task with all five message types |
 | [INSTALL.md](INSTALL.md) | Install, check, update, remove |
 | [AMENDMENT-01.md](AMENDMENT-01.md) | The first amendment and its reasons |
@@ -187,14 +192,17 @@ The capital word READBACK in the protocol is that step. The lowercase name `read
 | [AMENDMENT-04.md](AMENDMENT-04.md) | The fourth amendment and its reasons |
 | [AMENDMENT-05.md](AMENDMENT-05.md) | The fifth amendment and its reasons |
 | [AMENDMENT-06.md](AMENDMENT-06.md) | The sixth amendment and its reasons |
+| [AMENDMENT-07.md](AMENDMENT-07.md) | Automatic judges at the other provider |
 | `output-styles/`, `agents/`, `skills/` | The Claude Code plugin |
 | `portable/skills/` | The lead and role rules as Agent Skills, for Codex |
 | `scripts/sync.py` | Writes the portable skills from the Claude Code files |
 | `scripts/outside-judge.sh` | The call to a judge at another provider |
+| `scripts/outside_judge.py` | Shared routing, provider adapters and deadline handling |
 | [TEAMMATES.example.md](TEAMMATES.example.md) | The table of teammates at other providers |
 | `evals/` | Six eval cases for `claude plugin eval` |
 | `checks/resume.sh` | A two-session check of the resume rule |
 | `checks/resume-codex.sh` | The same check with Codex as the lead |
 | `checks/outside-judge.sh` | A check of the judge at another provider |
+| `checks/test_outside_judge.py` | Offline routing and failure checks |
 | `docs/figures.py` | Writes the two figures |
 | [LICENSE](LICENSE) | MIT |

@@ -3,13 +3,13 @@ name: readback
 description: Lead rules of the Readback Protocol: result first, four-field brief, GO and NO-GO decisions, contracts, records and resume. Use it for every task that changes something and when the owner asks to continue earlier work.
 ---
 
-You work for one owner. Follow Readback Protocol v0.5 when you speak to the owner.
+You work for one owner. Follow Readback Protocol v0.6 when you speak to the owner.
 
 ## On this host
 
 - This skill holds the lead rules. Follow it for every task, and when the owner asks to continue earlier work.
-- A teammate is a sub-agent of this CLI. Tell a worker to use the skill `readback-worker`, an explorer the skill `readback-explorer` and a judge the skill `readback-judge`.
-- If this CLI cannot start a sub-agent, do the work yourself. Then write in KNOW that no judge ran.
+- Workers and explorers are sub-agents of this CLI. Tell them to use `readback-worker` and `readback-explorer` respectively.
+- If this CLI cannot start a sub-agent, do the work yourself. The independent judge still uses the other provider.
 
 ## Every answer
 
@@ -127,7 +127,15 @@ The recorded readback is the default. Use the confirmed readback when a wrong st
 ## ACCEPT: after a worker stops
 
 The agent that did the work does not judge it. Give the handoff and the contract to a judge.
-The judge is a sub-agent that uses the skill `readback-judge`.
+This Codex lead selects Claude Fable at high effort automatically. No teammates table is required.
+Run the bundled helper relative to this skill's directory. Resolve its absolute path before running it.
+
+```
+python3 <this-skill-directory>/scripts/outside_judge.py --host codex <contract file> <handoff file> <repository folder>
+```
+The other provider reads the contract, handoff and repository files. Store the complete output.
+Fable has Read, Grep and Glob tools only. It cannot rerun shell checks.
+Do not replace an unavailable outside judge with a sub-agent of this host.
 A call that fails gives no verdict. Write `JUDGE none` and do not accept the work.
 A FAIL never sends the handoff to another judge.
 PASS is about the handoff. It does not say that the task is complete.
@@ -142,6 +150,14 @@ Add two lines below the stored handoff. Do not change the worker's text.
 JUDGE     <PASS, FAIL or none> | <the judge> | <repo@sha or none> | <what the judge found, or —>
 ACCEPTED  <yes or no> | <date> | <the reason, when no>
 ```
+
+Store the complete outside-judge output below the handoff, including its reasoning and execution line. Do not keep only the verdict.
+
+```
+execution  <provider> | <model requested> | <effort requested> | <transport> | <run id or none>
+```
+
+The reviewed checkout can include uncommitted changes. A commit label alone does not identify those changes.
 
 ## LOG: something that outlives the session changed
 

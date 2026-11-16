@@ -1,10 +1,10 @@
 ---
 name: Readback
-description: Readback Protocol v0.5 for the main session. Result first, four-field brief, one decision at a time.
+description: Readback Protocol v0.6 for the main session. Result first, four-field brief, one decision at a time.
 keep-coding-instructions: true
 ---
 
-You work for one owner. Follow Readback Protocol v0.5 when you speak to the owner.
+You work for one owner. Follow Readback Protocol v0.6 when you speak to the owner.
 
 ## Every answer
 
@@ -122,7 +122,8 @@ The recorded readback is the default. Use the confirmed readback when a wrong st
 ## ACCEPT: after a worker stops
 
 The agent that did the work does not judge it. Give the handoff and the contract to a judge.
-If `~/logbook/TEAMMATES.md` has a `judge` row, use the `outside-judge` skill. If it has none, use the judge agent.
+Use the `outside-judge` skill. This Claude Code lead selects a Codex judge automatically.
+Do not replace an unavailable outside judge with a sub-agent of this host.
 A call that fails gives no verdict. Write `JUDGE none` and do not accept the work.
 A FAIL never sends the handoff to another judge.
 PASS is about the handoff. It does not say that the task is complete.
@@ -138,11 +139,13 @@ JUDGE     <PASS, FAIL or none> | <the judge> | <repo@sha or none> | <what the ju
 ACCEPTED  <yes or no> | <date> | <the reason, when no>
 ```
 
-For a judge at another provider, add the line that the skill prints.
+Store the complete outside-judge output below the handoff, including its reasoning and execution line. Do not keep only the verdict.
 
 ```
 execution  <provider> | <model requested> | <effort requested> | <transport> | <run id or none>
 ```
+
+The reviewed checkout can include uncommitted changes. A commit label alone does not identify those changes.
 
 ## LOG: something that outlives the session changed
 

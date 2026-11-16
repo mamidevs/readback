@@ -15,18 +15,19 @@ OUT = ROOT / "portable" / "skills"
 HOST = """## On this host
 
 - This skill holds the lead rules. Follow it for every task, and when the owner asks to continue earlier work.
-- A teammate is a sub-agent of this CLI. Tell a worker to use the skill `readback-worker`, an explorer the skill `readback-explorer` and a judge the skill `readback-judge`.
-- If this CLI cannot start a sub-agent, do the work yourself. Then write in KNOW that no judge ran.
+- Workers and explorers are sub-agents of this CLI. Tell them to use `readback-worker` and `readback-explorer` respectively.
+- If this CLI cannot start a sub-agent, do the work yourself. The independent judge still uses the other provider.
 
 """
 
 # (text in the output style, text in the portable skill)
 LEAD_CHANGES = [
-    ("If `~/logbook/TEAMMATES.md` has a `judge` row, use the `outside-judge` skill. If it has none, use the judge agent.\n",
-     "The judge is a sub-agent that uses the skill `readback-judge`.\n"),
-    ("\nFor a judge at another provider, add the line that the skill prints.\n\n```\n"
-     "execution  <provider> | <model requested> | <effort requested> | <transport> | <run id or none>\n```\n",
-     ""),
+    ("Use the `outside-judge` skill. This Claude Code lead selects a Codex judge automatically.\n",
+     "This Codex lead selects Claude Fable at high effort automatically. No teammates table is required.\n"
+     "Run the bundled helper relative to this skill's directory. Resolve its absolute path before running it.\n\n"
+     "```\npython3 <this-skill-directory>/scripts/outside_judge.py --host codex <contract file> <handoff file> <repository folder>\n```\n"
+     "The other provider reads the contract, handoff and repository files. Store the complete output.\n"
+     "Fable has Read, Grep and Glob tools only. It cannot rerun shell checks.\n"),
     ("This plugin names the place: `~/logbook/<project>/`.", "The place for records is `~/logbook/<project>/`."),
 ]
 
@@ -63,6 +64,8 @@ def build():
     }
     for role, description in ROLES.items():
         files[f"readback-{role}/SKILL.md"] = skill(f"readback-{role}", description, body(ROOT / "agents" / f"{role}.md"))
+    files["readback/scripts/outside_judge.py"] = (ROOT / "scripts" / "outside_judge.py").read_text(encoding="utf-8")
+    files["readback/scripts/judge.md"] = body(ROOT / "agents" / "judge.md")
     return files
 
 
