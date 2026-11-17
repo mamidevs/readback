@@ -19,12 +19,18 @@ The other provider sees the contract, the handoff and the repository folder.
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/outside-judge.sh" --host claude <contract file> <handoff file> <repository folder>
 ```
 
-3. Read the complete output. Its first two lines identify the verdict and execution.
+3. Read the complete output. Its first three lines identify the verdict, the execution and the receipt.
 
 ```
 JUDGE      <PASS, FAIL or none> | <provider:model> | <repo@sha or none> | <note>
 execution  <provider> | <model requested> | <effort requested> | cli | none
+receipt    <attempt id> | <ends-equal or unbound: reason> | validation <true, false n, unparsed or unavailable> | <path of the completed file>
+receipt    none | <reason>
 ```
+
+The helper prints one of the two receipt forms.
+
+The third line is the receipt. A receipt changes no verdict.
 
 4. Store the complete output below the handoff, including the judge's reasoning. Then add ACCEPTED. Do not change the worker's text.
 

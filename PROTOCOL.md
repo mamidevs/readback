@@ -231,11 +231,29 @@ JUDGE     <PASS, FAIL or none> | <the judge> | <repo@sha or none> | <what the ju
 ACCEPTED  <yes or no> | <date> | <the reason, when no>
 ```
 
-For an outside judge, store the complete helper output before ACCEPTED, including the execution line and the full answer.
+For an outside judge, store the complete helper output before ACCEPTED, including the execution line, the receipt line and the full answer.
 The output records the provider, requested model, reported model when available, requested effort and execution method.
 Claude Fable receives only Read, Grep and Glob tools. It cannot rerun shell checks.
 Codex runs with its read-only sandbox. CLI settings and managed policies remain part of the trust boundary.
 A commit label does not identify uncommitted changes in the reviewed checkout.
+
+The helper output starts with three lines. The third line is the receipt.
+
+```
+JUDGE      <PASS, FAIL or none> | <provider:model> | <repo@sha or none> | <note>
+execution  <provider> | <model requested> | <effort requested> | cli | none
+receipt    <attempt id> | <ends-equal or unbound: reason> | validation <true, false n, unparsed or unavailable> | <path of the completed file>
+receipt    none | <reason>
+```
+
+The helper prints one of the two receipt forms.
+
+When receipt setup succeeds, the helper stores a started record below the Git common directory before the provider call; after a non-interrupted call it attempts to store a completed record.
+Without a stored completed record, the receipt is `receipt    none | <reason>`.
+In the first form, `false n` gives the number of defects that the structural validator found.
+A receipt changes no verdict.
+The review records and the observation file are local and untrusted: the agent runs as the same user and can write them.
+ends-equal means that both captures succeeded with the same manifest identity; it does not establish unchanged content between captures.
 
 ## 5. Trace
 

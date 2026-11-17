@@ -140,11 +140,18 @@ JUDGE     <PASS, FAIL or none> | <the judge> | <repo@sha or none> | <what the ju
 ACCEPTED  <yes or no> | <date> | <the reason, when no>
 ```
 
-Store the complete outside-judge output below the handoff, including its reasoning and execution line. Do not keep only the verdict.
+Store the complete outside-judge output below the handoff, including its reasoning, execution line and receipt line. Do not keep only the verdict.
 
 ```
+JUDGE      <PASS, FAIL or none> | <provider:model> | <repo@sha or none> | <note>
 execution  <provider> | <model requested> | <effort requested> | <transport> | <run id or none>
+receipt    <attempt id> | <ends-equal or unbound: reason> | validation <true, false n, unparsed or unavailable> | <path of the completed file>
+receipt    none | <reason>
 ```
+
+The helper prints one of the two receipt forms.
+
+The helper output starts with these lines. Its first three lines identify the verdict, the execution and the receipt. The third line is the receipt. A receipt changes no verdict.
 
 The reviewed checkout can include uncommitted changes. A commit label alone does not identify those changes.
 

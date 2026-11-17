@@ -140,6 +140,10 @@ Calls have a deadline. An unavailable model or failed call gives `JUDGE none`; t
 
 Fable has Read, Grep, and Glob tools only; it cannot rerun shell checks. The Codex judge uses a read-only sandbox. Provider runtime restrictions remain the provider's responsibility. Execution metadata records the request; it is not independent model attestation.
 
+The helper prints a receipt as its third line. A receipt changes no verdict. The helper stores review records below the Git common directory: `<git common dir>/readback/reviews/` holds the started and completed records, and `<git common dir>/readback/by-manifest/` holds markers for completed records whose second capture succeeded; a failed marker write leaves the completed record without a marker. The review records and the observation file are local and untrusted: the agent runs as the same user and can write them.
+
+When enabled, commit observation attempts to append one line to `<git common dir>/readback/commit-observations.jsonl` for a command that the guard does not deny and that contains a recognized commit call or a failed-parse candidate. The line describes the first recognized commit call in the parser's traversal order, or records a parse failure. The commit observation describes; it denies nothing and decides nothing. Without a directory at `<git common dir>/readback/reviews`, the commit observation takes no capture and writes no observation. Set READBACK_COMMIT_CHECK=off to turn the commit observation off.
+
 ## Checks and limits
 
 Run the offline checks from the repository root:
@@ -154,7 +158,7 @@ The suites cover judge routing, project identity and fallback, publication confl
 
 Optional live checks are in `checks/outside-judge.sh`, `checks/resume.sh`, and `checks/resume-codex.sh`. The sixteen cases in `evals/` exercise worker, explorer and judge behavior. Read their scripts before running them: live checks use provider accounts and create test files.
 
-The protocol is an instruction layer. Use your CLI's permissions for hard execution limits. readback adds one: a hook denies Git commands that discard uncommitted work, such as `git reset --hard`, `git restore`, `git clean` and `git stash`. The Claude Code plugin enables it. Codex runs the same script after you add it to `~/.codex/hooks.json` and trust it; see [INSTALL](INSTALL.md#git-guard-for-codex). The hook reads the command line only, and a hook that times out lets the command run. The publisher enforces its storage checks; it cannot establish that a test ran, an owner approved an action, or a handoff deserves PASS. Those claims still need evidence and review.
+The protocol is an instruction layer. Use your CLI's permissions for hard execution limits. readback adds one: a hook denies Git commands that discard uncommitted work, such as `git reset --hard`, `git restore`, `git clean` and `git stash`. The Claude Code plugin enables it. Codex runs the same script after you add it to `~/.codex/hooks.json` and trust it; see [INSTALL](INSTALL.md#git-guard-for-codex). The deny check examines the command line; commit observation also reads repository content and review records. A hook that times out lets the command run. The publisher enforces its storage checks; it cannot establish that a test ran, an owner approved an action, or a handoff deserves PASS. Those claims still need evidence and review.
 
 This is a personal workflow with cooperating local sessions. It has no multi-user access control, cloud synchronization, hosted collaboration, or task tracker integration. The index is rebuildable; authoritative records need your own backup policy. Retiring an existing Hub requires preserved history, verified recovery material, and fresh sessions using the new routing rules.
 
@@ -172,7 +176,11 @@ This is a personal workflow with cooperating local sessions. It has no multi-use
 | [scripts/project_registry.py](scripts/project_registry.py) | Project identity, validation, and routing |
 | [scripts/publish_records.py](scripts/publish_records.py) | Serialized Markdown publication and recovery |
 | [scripts/project_index.py](scripts/project_index.py) | Document catalog, query, and freshness checks |
-| [scripts/outside_judge.py](scripts/outside_judge.py) | Provider selection, restrictions, and deadlines |
+| [scripts/outside_judge.py](scripts/outside_judge.py) | Provider selection, restrictions, deadlines, and the receipt line |
+| [scripts/validate_handoff.py](scripts/validate_handoff.py) | Structural validator for a contract and a handoff |
+| [scripts/review_capture.py](scripts/review_capture.py) | Content capture of a Git worktree |
+| [scripts/review_receipt.py](scripts/review_receipt.py) | Review records and the receipt line |
+| [scripts/commit_observation.py](scripts/commit_observation.py) | Commit observation of the Git guard hook |
 | [checks/](checks/), [evals/](evals/) | Offline checks and optional live fixtures |
 | [LICENSE](LICENSE) | MIT |
 

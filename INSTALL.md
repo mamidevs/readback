@@ -98,6 +98,11 @@ claude plugin marketplace remove readback
 
 `~/logbook` stays. Delete it yourself if you want to.
 
+Run this from the intended repository; it deletes review records and observations shared by its main and linked worktrees.
+```
+rm -r "$(git rev-parse --git-common-dir)/readback"
+```
+
 ## OpenAI Codex
 
 Codex has no output style and no plugin from this repository. It reads Agent Skills and `AGENTS.md`.
@@ -132,6 +137,8 @@ cp readback/portable/codex/hooks.json ~/.codex/hooks.json
 If the file exists, add the `PreToolUse` entry of `portable/codex/hooks.json` to it.
 Then start Codex, type `/hooks` and trust the readback hook. Codex skips a hook until you trust it.
 The hook runs in every Codex session, also in sessions without the readback skill.
+Commit observation needs commit_observation.py and review_capture.py beside the portable hook; the copied lead folder holds them.
+Set READBACK_COMMIT_CHECK=off to turn the commit observation off.
 
 Check: in a test repository with an uncommitted change, ask Codex to run `git reset --hard HEAD`.
 Codex reports a refusal that starts with `readback blocks`, and the change stays.
