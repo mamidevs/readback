@@ -116,7 +116,7 @@ printf '\nFor every task, and when I ask to continue earlier work, load the skil
 
 The copy adds four folders: `readback`, `readback-worker`, `readback-explorer` and `readback-judge`.
 The lead folder includes the outside-judge helper and its judge rules. Keep the complete folder when copying.
-The line in `AGENTS.md` applies to every Codex session. It loads the lead rules for a task, not for a plain question.
+The line in `AGENTS.md` applies to every Codex session. It requires loading the lead rules for every task; plain questions need no BRIEF.
 Codex can ask before it writes outside the project. Approve the access to the logbook.
 
 Check: ask Codex for a small change. The answer ends in a brief of four fields, and `~/logbook/<project>/` holds `LOG.md` and `CURRENT.md`.
