@@ -117,7 +117,35 @@ Codex can ask before it writes outside the project. Approve the access to the lo
 Check: ask Codex for a small change. The answer ends in a brief of four fields, and `~/logbook/<project>/` holds `LOG.md` and `CURRENT.md`.
 
 Update: pull the repository and copy the four folders again.
-Remove: delete the four folders from `~/.agents/skills/` and the line from `~/.codex/AGENTS.md`.
+Remove: first remove the readback entry from `~/.codex/hooks.json` (see the Git guard below). Then delete the four folders from `~/.agents/skills/` and the line from `~/.codex/AGENTS.md`.
+
+### Git guard for Codex
+
+The lead folder holds `scripts/guard_git.py`, the hook that the Claude Code plugin runs.
+Codex runs it before each shell command when `~/.codex/hooks.json` names it.
+Copy the four folders first. Then, if you have no `~/.codex/hooks.json`, copy the file from this repository:
+
+```
+cp readback/portable/codex/hooks.json ~/.codex/hooks.json
+```
+
+If the file exists, add the `PreToolUse` entry of `portable/codex/hooks.json` to it.
+Then start Codex, type `/hooks` and trust the readback hook. Codex skips a hook until you trust it.
+The hook runs in every Codex session, also in sessions without the readback skill.
+
+Check: in a test repository with an uncommitted change, ask Codex to run `git reset --hard HEAD`.
+Codex reports a refusal that starts with `readback blocks`, and the change stays.
+A file in `~/.codex/hooks.json` is not proof. An untrusted hook does not run.
+
+If the entry exists and the script does not, Codex refuses every shell command with `can't open file`.
+Copy the folders again, or remove the entry.
+An update that copies the folders again does not change the hook definition, so the trust stays.
+
+Limits on Codex:
+- Codex does not pass the folder of a command that sets its own workdir. The hook uses the session folder.
+  A checkout of one file name can then pass when the session folder is outside the repository.
+- Input sent to a shell that already runs is not checked again.
+- A hook that times out lets the command run.
 
 ## Other CLIs
 

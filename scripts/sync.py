@@ -68,6 +68,7 @@ def build():
         files[f"readback-{role}/SKILL.md"] = skill(f"readback-{role}", description, body(ROOT / "agents" / f"{role}.md"))
     files["readback/scripts/outside_judge.py"] = (ROOT / "scripts" / "outside_judge.py").read_text(encoding="utf-8")
     files["readback/scripts/judge.md"] = body(ROOT / "agents" / "judge.md")
+    files["readback/scripts/guard_git.py"] = (ROOT / "hooks" / "guard_git.py").read_text(encoding="utf-8")
     for helper in ("project_registry.py", "resolve_codex_project.py", "resolve_claude_project.py", "project_index.py", "publish_records.py"):
         files[f"readback/scripts/{helper}"] = (ROOT / "scripts" / helper).read_text(encoding="utf-8")
     return files

@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.agents/skills/readback/scripts/guard_git.py\"",
+            "timeout": 10,
+            "statusMessage": "readback: checking Git command"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -154,7 +154,7 @@ The suites cover judge routing, project identity and fallback, publication confl
 
 Optional live checks are in `checks/outside-judge.sh`, `checks/resume.sh`, and `checks/resume-codex.sh`. The fourteen cases in `evals/` exercise worker, explorer and judge behavior. Read their scripts before running them: live checks use provider accounts and create test files.
 
-The protocol is an instruction layer. Use your CLI's permissions for hard execution limits. The Claude Code plugin adds one: a hook denies Git commands that discard uncommitted work, such as `git reset --hard`, `git restore`, `git clean` and `git stash`. Codex has no equivalent yet. The publisher enforces its storage checks; it cannot establish that a test ran, an owner approved an action, or a handoff deserves PASS. Those claims still need evidence and review.
+The protocol is an instruction layer. Use your CLI's permissions for hard execution limits. readback adds one: a hook denies Git commands that discard uncommitted work, such as `git reset --hard`, `git restore`, `git clean` and `git stash`. The Claude Code plugin enables it. Codex runs the same script after you add it to `~/.codex/hooks.json` and trust it; see [INSTALL](INSTALL.md#git-guard-for-codex). The hook reads the command line only, and a hook that times out lets the command run. The publisher enforces its storage checks; it cannot establish that a test ran, an owner approved an action, or a handoff deserves PASS. Those claims still need evidence and review.
 
 This is a personal workflow with cooperating local sessions. It has no multi-user access control, cloud synchronization, hosted collaboration, or task tracker integration. The index is rebuildable; authoritative records need your own backup policy. Retiring an existing Hub requires preserved history, verified recovery material, and fresh sessions using the new routing rules.
 
@@ -167,7 +167,7 @@ This is a personal workflow with cooperating local sessions. It has no multi-use
 | [Shared projects](docs/shared-projects.md), [project identity](docs/project-identity.md) | Optional project memory and its operational contract |
 | [Shared-project extension](docs/protocol-0.7-draft.md), [schemas/](schemas/) | Shipped extension, generic data shapes, and the explicitly draft handoff envelope |
 | [output-styles/](output-styles/), [agents/](agents/), [skills/](skills/) | Claude Code instructions |
-| [hooks/](hooks/) | Claude Code hook that denies Git commands which discard work |
+| [hooks/](hooks/), [portable/codex/](portable/codex/) | Hook that denies Git commands which discard work, and its Codex definition |
 | [portable/skills/](portable/skills/), [scripts/sync.py](scripts/sync.py) | Generated portable instructions and bundled helpers |
 | [scripts/project_registry.py](scripts/project_registry.py) | Project identity, validation, and routing |
 | [scripts/publish_records.py](scripts/publish_records.py) | Serialized Markdown publication and recovery |

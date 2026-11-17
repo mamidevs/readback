@@ -12,8 +12,20 @@ import tempfile
 import unittest
 
 
-HOOK = Path(__file__).resolve().parents[1] / "hooks" / "guard_git.py"
-CONFIG = Path(__file__).resolve().parents[1] / "hooks" / "hooks.json"
+ROOT = Path(__file__).resolve().parents[1]
+HOOK = ROOT / "hooks" / "guard_git.py"
+CONFIG = ROOT / "hooks" / "hooks.json"
+PORTABLE_HOOK = ROOT / "portable" / "skills" / "readback" / "scripts" / "guard_git.py"
+CODEX_CONFIG = ROOT / "portable" / "codex" / "hooks.json"
+
+# PreToolUse input that Codex 0.155.1 sent on 2026-11-17, with ids shortened.
+CODEX_LEAD = {
+    "session_id": "01a1e955-cccf", "turn_id": "01a1e955-cd33", "transcript_path": None,
+    "cwd": ".", "hook_event_name": "PreToolUse", "model": "gpt-6-sol",
+    "permission_mode": "bypassPermissions", "tool_name": "Bash",
+    "tool_input": {"command": "git reset --hard HEAD"}, "tool_use_id": "exec-73f3748a",
+}
+CODEX_SUB_AGENT = dict(CODEX_LEAD, agent_id="01a1e955-ed3e", agent_type="default")
 
 DENIED = [
     "git reset --hard",
@@ -99,21 +111,21 @@ ALLOWED = [
 ]
 
 
-def run(payload):
-    text = payload if isinstance(payload, str) else json.dumps(payload)
-    return subprocess.run([sys.executable, str(HOOK)], input=text, capture_output=True, text=True, timeout=10)
-
-
-def bash(command, agent_type=None, cwd=None):
-    payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": command}}
-    if cwd:
-        payload["cwd"] = str(cwd)
-    if agent_type:
-        payload["agent_type"] = agent_type
-    return run(payload)
-
-
 class GuardGitTests(unittest.TestCase):
+    hook = HOOK
+
+    def run_hook(self, payload):
+        text = payload if isinstance(payload, str) else json.dumps(payload)
+        return subprocess.run([sys.executable, str(self.hook)], input=text, capture_output=True, text=True, timeout=10)
+
+    def bash(self, command, agent_type=None, cwd=None):
+        payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": command}}
+        if cwd:
+            payload["cwd"] = str(cwd)
+        if agent_type:
+            payload["agent_type"] = agent_type
+        return self.run_hook(payload)
+
     def assert_denied(self, result, command):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(result.stdout.strip(), "allowed: " + repr(command))
@@ -125,12 +137,12 @@ class GuardGitTests(unittest.TestCase):
     def test_commands_that_discard_work_are_denied(self):
         for command in DENIED:
             with self.subTest(command=command):
-                self.assert_denied(bash(command), command)
+                self.assert_denied(self.bash(command), command)
 
     def test_other_commands_are_allowed(self):
         for command in ALLOWED:
             with self.subTest(command=command):
-                result = bash(command)
+                result = self.bash(command)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, "", "denied: " + repr(command))
 
@@ -149,13 +161,13 @@ class GuardGitTests(unittest.TestCase):
             for command in ("git checkout tracked.txt", "git -C sub checkout file.txt",
                             "git --work-tree=sub checkout file.txt", "git checkout deleted.txt"):
                 with self.subTest(command=command):
-                    self.assert_denied(bash(command, cwd=base), command)
+                    self.assert_denied(self.bash(command, cwd=base), command)
             for command in ("git checkout main", "git checkout HEAD~0", "git checkout -b feature main"):
                 with self.subTest(command=command):
-                    self.assertEqual(bash(command, cwd=base).stdout, "", "a revision was denied: " + command)
+                    self.assertEqual(self.bash(command, cwd=base).stdout, "", "a revision was denied: " + command)
 
     def test_sub_agent_is_told_to_return_blocked(self):
-        result = bash("git reset --hard", agent_type="readback:worker")
+        result = self.bash("git reset --hard", agent_type="readback:worker")
         reason = json.loads(result.stdout)["hookSpecificOutput"]["permissionDecisionReason"]
         self.assertIn("BLOCKED", reason)
         self.assertIn("git reset --hard", reason)
@@ -163,9 +175,26 @@ class GuardGitTests(unittest.TestCase):
     def test_other_tools_and_bad_input_are_allowed(self):
         for payload in ({"tool_name": "Read", "tool_input": {"file_path": "x"}}, "not json", "{}"):
             with self.subTest(payload=payload):
-                result = run(payload)
+                result = self.run_hook(payload)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, "")
+
+    def test_codex_input_is_denied(self):
+        result = self.run_hook(CODEX_LEAD)
+        self.assert_denied(result, "codex lead")
+        self.assertIn("Tell the owner", json.loads(result.stdout)["hookSpecificOutput"]["permissionDecisionReason"])
+
+    def test_known_gap_session_folder_outside_the_repository(self):
+        # Codex passes the session folder, not the workdir of the command.
+        # Outside a repository a single missing name counts as a revision, so the hook allows it.
+        with tempfile.TemporaryDirectory() as folder:
+            result = self.bash("git checkout tracked.txt", cwd=folder)
+            self.assertEqual(result.stdout, "", "the documented gap changed; update INSTALL.md")
+
+    def test_codex_sub_agent_is_told_to_return_blocked(self):
+        result = self.run_hook(CODEX_SUB_AGENT)
+        self.assert_denied(result, "codex sub-agent")
+        self.assertIn("BLOCKED", json.loads(result.stdout)["hookSpecificOutput"]["permissionDecisionReason"])
 
     def test_plugin_config_runs_the_hook_before_bash(self):
         config = json.loads(CONFIG.read_text(encoding="utf-8"))
@@ -173,6 +202,23 @@ class GuardGitTests(unittest.TestCase):
         self.assertEqual([entry["matcher"] for entry in entries], ["Bash"])
         command = entries[0]["hooks"][0]["command"]
         self.assertIn("${CLAUDE_PLUGIN_ROOT}/hooks/guard_git.py", command)
+
+
+class PortableGuardGitTests(GuardGitTests):
+    """The copy that the Codex hook runs passes the same checks."""
+    hook = PORTABLE_HOOK
+
+    def test_portable_copy_equals_the_plugin_hook(self):
+        self.assertEqual(PORTABLE_HOOK.read_bytes(), HOOK.read_bytes())
+
+    def test_codex_config_runs_the_installed_copy_before_bash(self):
+        config = json.loads(CODEX_CONFIG.read_text(encoding="utf-8"))
+        self.assertEqual(list(config["hooks"]), ["PreToolUse"])
+        entries = config["hooks"]["PreToolUse"]
+        self.assertEqual([entry["matcher"] for entry in entries], ["Bash"])
+        handler = entries[0]["hooks"][0]
+        self.assertEqual(handler["type"], "command")
+        self.assertIn('"$HOME/.agents/skills/readback/scripts/guard_git.py"', handler["command"])
 
 
 if __name__ == "__main__":

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Deny Git commands that can discard work that the agent did not make.
 
-Claude Code runs this hook before each Bash call and passes the hook input as JSON on stdin.
+Claude Code and Codex run this hook before each Bash call and pass the hook input as JSON on stdin.
 A match prints a deny decision. Any other input prints nothing, so the call goes ahead.
 The hook reads the command line only. A script that runs Git inside itself is not seen.
 A checkout of one name counts as a path when it exists in the session, -C or --work-tree folder,
 or when Git there does not resolve it as a revision. The hook does not follow cd or resolve Git aliases.
+Codex does not pass the workdir of a command, so the session folder stands in for it.
 """
 
 import json
