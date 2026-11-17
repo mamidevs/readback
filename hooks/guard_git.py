@@ -55,16 +55,18 @@ def is_revision(base, name):
 
 def discarding(sub, args, base):
     """Return True when this Git subcommand can discard uncommitted work."""
-    short = short_flags(args)
-    force = "f" in short or long_option(args, "--force")
+    paths = "--" in args
+    options = args[:args.index("--")] if paths else args
+    short = short_flags(options)
+    force = "f" in short or long_option(options, "--force")
     if sub == "reset":
-        return long_option(args, "--hard")
+        return long_option(options, "--hard")
     if sub == "checkout":
-        if force or "--" in args or "." in args or long_option(args, "--pathspec-from-file"):
+        if force or paths or "." in options or long_option(options, "--pathspec-from-file"):
             return True
-        if "b" in short or "B" in short or long_option(args, "--orphan"):
+        if "b" in short or "B" in short or long_option(options, "--orphan"):
             return False
-        names = [a for a in args if not a.startswith("-")]
+        names = [a for a in options if not a.startswith("-")]
         # Two names are a tree and a path. One name is a path when it exists or is not a revision.
         if len(names) >= 2:
             return True
@@ -72,17 +74,17 @@ def discarding(sub, args, base):
             return os.path.lexists(os.path.join(base, names[0])) or not is_revision(base, names[0])
         return False
     if sub == "switch":
-        return force or long_option(args, "--discard-changes")
+        return force or long_option(options, "--discard-changes")
     if sub == "rm":
         return force
     if sub == "restore":
-        staged = "S" in short or long_option(args, "--staged")
-        worktree = "W" in short or long_option(args, "--worktree")
+        staged = "S" in short or long_option(options, "--staged")
+        worktree = "W" in short or long_option(options, "--worktree")
         return worktree or not staged
     if sub == "clean":
-        return not ("n" in short or long_option(args, "--dry-run"))
+        return not ("n" in short or long_option(options, "--dry-run"))
     if sub == "stash":
-        action = args[0] if args and not args[0].startswith("-") else "push"
+        action = options[0] if options and not options[0].startswith("-") else "push"
         return action not in ("list", "show")
     return False
 
@@ -127,8 +129,25 @@ def simple_command(words, cwd):
     return None
 
 
+def substitutions(command):
+    """Yield the text inside each $(...) and each backtick pair, also inside double quotes."""
+    start = command.find("$(")
+    while start != -1:
+        depth, index = 1, start + 2
+        while index < len(command) and depth:
+            depth += {"(": 1, ")": -1}.get(command[index], 0)
+            index += 1
+        yield command[start + 2:index - 1 if depth == 0 else index]
+        start = command.find("$(", start + 2)
+    yield from re.findall(r"`([^`]*)`", command)
+
+
 def check(command, cwd="."):
     """Return the first denied Git command inside a shell command line, or None."""
+    for inner in substitutions(command):
+        found = check(inner, cwd)
+        if found:
+            return found
     text = command.replace("\n", " ; ").replace("`", " ")
     try:
         lexer = shlex.shlex(text, posix=True, punctuation_chars=True)

@@ -62,6 +62,11 @@ DENIED = [
     "$(which git) stash",
     "eval \"git stash\"",
     "(cd work; git stash)",
+    "git clean -f -- -n",
+    "git restore -- -S",
+    "echo \"$(git reset --hard)\"",
+    "echo \"`git stash`\"",
+    "x=\"$(echo a; git clean -fd)\"",
 ]
 
 ALLOWED = [
@@ -88,6 +93,9 @@ ALLOWED = [
     "git checkout -qb feature",
     "git switch -c feature",
     "echo done && git status",
+    "git rm -- -f",
+    "git reset -- --hard",
+    "git clean -n -- -f",
 ]
 
 

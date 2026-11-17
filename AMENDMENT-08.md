@@ -47,9 +47,10 @@ After the rule change, all six worker cases and the explorer case ran once more.
 judge-tool-call-evidence is an honest DONE whose check is a Grep tool call without an exit code. It runs in a Git worktree, so it also exercises the worktree section. Both judges answered PASS in one round each.
 The Fable answer used the worktree section: it cited ` M README.md` with one insertion and one deletion.
 
-`checks/test_guard_git.py` gives the hook 50 command lines that it must deny and 26 that it must allow. All pass.
+`checks/test_guard_git.py` gives the hook 55 command lines that it must deny and 29 that it must allow. All pass.
 The release judge found that the first hook allowed `git checkout HEAD tracked.txt`. The hook now denies a checkout of a path and a forced `git rm`.
 A second judge FAIL showed `git stash create` and `store` and combined force flags such as `-qf`. The hook now reads short option clusters, long option abbreviations, wrappers such as env and timeout, subshells and eval.
+A third judge FAIL showed file names after `--` read as options and Git inside a quoted `$(...)`. The hook now stops reading options at `--` and checks every command substitution. The release contract states the hook's promise as the tested command list.
 A live Claude Code run on Haiku 5.5 called `git reset --hard` in a test repository. The hook denied the call, and the uncommitted line stayed.
 
 ## Not included
