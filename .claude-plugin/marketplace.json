@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "readback",
-      "description": "Output style and agents that follow Readback Protocol v0.6.",
+      "description": "Readback Protocol v0.6 with optional shared project logbooks, serialized records, and document indexing.",
       "source": "./",
       "category": "productivity"
     }

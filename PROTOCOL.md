@@ -295,6 +295,6 @@ execution  <provider> | <model requested> | <effort requested> | <transport> | <
 
 Write the requested values. Write the model that the host reports only when it differs from the request.
 
-## Optional project binding extension (local development)
+## Optional project binding extension (package v0.7.0)
 
-A project may explicitly bind several repositories to one local record home. The resolved home overrides the repository-name default. An unbound repository retains the default; a marked but invalid binding stops writes. Shared records retain repository and check-context provenance. Only the lead publishes records through the profile's serialized publisher. A generated index locates documents and never overrides them. See [shared projects](docs/shared-projects.md). This extension does not publish a new release.
+A project may explicitly bind several repositories to one local record home. The resolved home overrides the repository-name default. An unbound repository retains the default; a marked but invalid binding stops writes. Shared records retain repository and check-context provenance. Only the lead publishes records through the profile's serialized publisher. A generated index locates documents and never overrides them. See [shared projects](docs/shared-projects.md). Package v0.7.0 includes this extension. The core communication rules above remain v0.6.

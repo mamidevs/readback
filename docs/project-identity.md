@@ -144,5 +144,5 @@ Qualified legacy references bind source UUID, snapshot hash, original path, and 
 Ambiguous aliases are rejected instead of selecting the newest or first match.
 The resolver does not build the project's historical reference map.
 
-[The 0.7 draft](protocol-0.7-draft.md) describes the broader protocol work.
+[The shared-project extension](protocol-0.7-draft.md) describes the shipped behavior and the handoff envelope that remains a draft.
 Routing tests establish local selection and identity behavior; they do not prove a private migration or installed-host workflow.

@@ -1,7 +1,9 @@
-# Readback Protocol 0.7 draft
+# Shared-project extension 0.7
 
-Status: local development draft. [PROTOCOL.md](../PROTOCOL.md) remains the published protocol reference.
-This document does not release a version, install host instructions, or prove a private migration succeeded.
+Status: the resolver, Markdown publisher, and document index ship in package v0.7.0.
+[PROTOCOL.md](../PROTOCOL.md) retains the core v0.6 communication rules.
+The extended handoff envelope described below remains a draft; this release does not implement its proposed acceptance semantics.
+The filename is retained for existing links. This document does not install host instructions or prove a private migration succeeded.
 
 ## Scope
 

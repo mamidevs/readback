@@ -6,7 +6,7 @@ A finished change tells you what exists now. It does not tell you why you chose 
 
 Start with one repository. When a project spans an API, backend, and frontend, optional project settings let those repositories use one logbook while every agent keeps working in its own code directory.
 
-**Version status:** the plugin manifest and core protocol remain **0.6.0 / v0.6**. Shared-project routing, record publication, and indexing are development additions in this checkout, described in the [0.7 draft](docs/protocol-0.7-draft.md). They are not a new tagged release or an automatic update to an existing installation.
+**Version:** **v0.7.0** includes shared-project routing, serialized Markdown publication, and document indexing. The core communication rules remain **Readback Protocol v0.6**. The [shared-project extension](docs/protocol-0.7-draft.md) documents the shipped behavior and identifies the extended handoff envelope that remains a draft. Existing installations require an explicit update.
 
 ## What it does
 
@@ -108,7 +108,7 @@ Then select the style in your Claude session:
 /output-style readback:Readback
 ```
 
-The marketplace commands install the published plugin. To try the development files from this checkout, run `claude --plugin-dir .` at its root and select the style in that session. A Git push alone does not update an installed plugin.
+The marketplace commands install the published plugin. To try a local checkout without installing it, run `claude --plugin-dir .` at its root and select the style in that session. For an existing installation, follow the [update instructions](INSTALL.md#update) and restart Claude Code.
 
 ### OpenAI Codex
 
@@ -121,7 +121,7 @@ cp -R readback/portable/skills/* ~/.agents/skills/
 printf '\nFor every task, and when I ask to continue earlier work, load the skill `readback` and follow it.\n' >> ~/.codex/AGENTS.md
 ```
 
-Run this setup once. The clone uses the default branch. To use this development checkout instead, copy its `portable/skills/` folders into `~/.agents/skills/`, including the bundled scripts. Copy them again after an update and start a fresh session.
+Run this setup once. The clone uses `main`; check out the `v0.7.0` tag before copying if you need this exact release. To use an existing checkout, copy its `portable/skills/` folders into `~/.agents/skills/`, including the bundled scripts. For a checkout tracking `main`, pull and copy again. For a pinned release, select the newer tag and copy again. Start a fresh session after updating.
 
 [INSTALL.md](INSTALL.md) covers installation checks, permissions, updates, and removal. Installing instructions does not grant access to your logbook; your CLI may ask for that separately.
 
@@ -165,7 +165,7 @@ This is a personal workflow with cooperating local sessions. It has no multi-use
 | [PROTOCOL.md](PROTOCOL.md), [EXAMPLE.md](EXAMPLE.md) | Core rules and a worked task |
 | [INSTALL.md](INSTALL.md) | Install, check, update, remove |
 | [Shared projects](docs/shared-projects.md), [project identity](docs/project-identity.md) | Optional project memory and its operational contract |
-| [0.7 draft](docs/protocol-0.7-draft.md), [schemas/](schemas/) | Development protocol extension and generic data shapes |
+| [Shared-project extension](docs/protocol-0.7-draft.md), [schemas/](schemas/) | Shipped extension, generic data shapes, and the explicitly draft handoff envelope |
 | [output-styles/](output-styles/), [agents/](agents/), [skills/](skills/) | Claude Code instructions |
 | [portable/skills/](portable/skills/), [scripts/sync.py](scripts/sync.py) | Generated portable instructions and bundled helpers |
 | [scripts/project_registry.py](scripts/project_registry.py) | Project identity, validation, and routing |
