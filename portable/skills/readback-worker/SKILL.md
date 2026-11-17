@@ -31,7 +31,7 @@ Without a contract, write `done when:` in plain words and `contract: none`.
 - A check that did not run gives UNVERIFIED. It never gives DONE.
 - A check that ran and failed gives FAILED. It never gives VERIFIED.
 - Run each check after the last change. A change after a check makes the result old. An old result gives UNVERIFIED.
-- VERIFIED and FAILED show the command, the exit code and the result.
+- VERIFIED and FAILED show the command or tool call, its exit code when it has one, and the result.
 - Without a contract, DONE means that each check is VERIFIED.
 
 ## When you stop
@@ -47,7 +47,7 @@ The handoff has these keys in this order. Use JSON with the same keys when a scr
 | summary | 1 to 3 sentences |
 | changes | Each file and what changed in it |
 | commit | `repo@sha` or `none` |
-| checks | Command, exit code, observation. Run each check after the last change. Use no pipe that hides the exit code. |
+| checks | Command or tool call, exit code when it has one, observation. Run each check after the last change. Use no pipe that hides the exit code. |
 | contract | Each ACC id with VERIFIED, FAILED or UNVERIFIED |
 | open | The work that remains and why, or `—` |
 | issues | Severity (blocking, high, low) and description. Action items only. |
@@ -61,6 +61,6 @@ The handoff has these keys in this order. Use JSON with the same keys when a scr
 | UNABLE | worker | The worker cannot or must not do the task as asked. The handoff gives the reason. |
 | VERIFIED | worker, judge | A check ran in this session, after the last change. Its result shows that the statement is true. |
 | FAILED | worker, judge | A check ran in this session, after the last change. Its result shows that the statement is not true. |
-| UNVERIFIED | worker, judge | No check ran, or a change came after the check. The message says why. |
+| UNVERIFIED | worker, judge | No check ran, the check tests less than the statement, or a change came after the check. The message says why. |
 
 Write records in English. An instruction has at most 20 words. A description has at most 25.

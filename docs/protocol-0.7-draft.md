@@ -1,7 +1,7 @@
 # Shared-project extension 0.7
 
 Status: the resolver, Markdown publisher, and document index ship in package v0.7.0.
-[PROTOCOL.md](../PROTOCOL.md) retains the core v0.6 communication rules.
+[PROTOCOL.md](../PROTOCOL.md) holds the core v0.7 communication rules.
 The extended handoff envelope described below remains a draft; this release does not implement its proposed acceptance semantics.
 The filename is retained for existing links. This document does not install host instructions or prove a private migration succeeded.
 

@@ -36,7 +36,7 @@ LEAD_CHANGES = [
 ROLES = {
     "worker": "Worker rules of the Readback Protocol. Use it when the lead gives you one bounded task that changes files. You return one HANDOFF.",
     "explorer": "Explorer rules of the Readback Protocol. Use it when the lead gives you a question to answer with evidence. You change no file and return one HANDOFF.",
-    "judge": "Judge rules of the Readback Protocol. Use it when the lead gives you a HANDOFF and its CONTRACT to judge. You change no file. Your first word is PASS or FAIL.",
+    "judge": "Judge rules of the Readback Protocol. Use it only when the owner or a check names it. A lead does not use it to accept work. You change no file. Your first word is PASS or FAIL.",
 }
 
 
@@ -61,7 +61,7 @@ def build():
         "readback/SKILL.md": skill(
             "readback",
             "Lead rules of the Readback Protocol: result first, four-field brief, GO and NO-GO decisions, contracts, "
-            "records and resume. Use it for every task that changes something and when the owner asks to continue earlier work.",
+            "records and resume. Use it for every task, and when the owner asks to continue earlier work.",
             first + "\n\n" + HOST + rest),
     }
     for role, description in ROLES.items():

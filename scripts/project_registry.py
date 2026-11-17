@@ -653,7 +653,7 @@ def resolve_project(registry_path, cwd, host, inspect_staged=False, logbook=None
         for reserved in [project["home"]] + project["retired_roots"]:
             require(not _overlap(destination, reserved), "Legacy fallback collides with a reserved path", "RESERVED_PATH")
     return {"status": "LEGACY_FALLBACK", "host": host, "home": str(destination),
-            "protocol_version": "0.6", "registry_generation": registry["generation"],
+            "protocol_version": "0.7", "registry_generation": registry["generation"],
             "project_uuid": None, "repo_uuid": None, "write_allowed": False,
             "log_path": str(destination / "LOG.md"), "current_path": str(destination / "CURRENT.md"),
             "records_path": str(destination / "records"), **_provenance(cwd, git)}

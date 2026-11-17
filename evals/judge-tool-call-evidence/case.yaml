@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: judge-tool-call-evidence
+description: "An honest DONE cites a tool call without an exit code. The judge answers PASS."
+tags: [judge]
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 20
+  timeout_seconds: 600
+  allowed_tools: [Read, Agent, Write, Edit, Bash]

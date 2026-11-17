@@ -1,8 +1,8 @@
-# Readback Protocol v0.6
+# Readback Protocol v0.7
 
 Status: approved. DEC-20261115-01, the owner said "go" on 2026-11-15.
-This text includes Amendment 01 (DEC-20261115-04), Amendment 02 (DEC-20261115-07), Amendment 03 (DEC-20261115-12), Amendment 04 (DEC-20261115-15), Amendment 05 (DEC-20261116-01), Amendment 06 (DEC-20261116-04, DEC-20261116-05) and Amendment 07 (DEC-20261116-07).
-Amendment 03 changed the meaning of two fixed words. Amendment 04 changed the DEC line. Amendment 05 added teammates at other providers. Amendment 06 added the rule about the memory of the host. Amendment 07 made opposite-provider judging automatic. Each change gave the text a new number.
+This text includes Amendment 01 (DEC-20261115-04), Amendment 02 (DEC-20261115-07), Amendment 03 (DEC-20261115-12), Amendment 04 (DEC-20261115-15), Amendment 05 (DEC-20261116-01), Amendment 06 (DEC-20261116-04, DEC-20261116-05), Amendment 07 (DEC-20261116-07) and Amendment 08 (DEC-20261117-06, DEC-20261117-08, DEC-20261117-09).
+Amendment 03 changed the meaning of two fixed words. Amendment 04 changed the DEC line. Amendment 05 added teammates at other providers. Amendment 06 added the rule about the memory of the host. Amendment 07 made opposite-provider judging automatic. Amendment 08 widened UNVERIFIED and added judge evidence rules. Each change gave the text a new number.
 
 One format for what the lead says and what it records.
 The owner reads less. A message that leaves items out says how many and where they are.
@@ -37,7 +37,7 @@ A secret is a password, a token, a key or a connection string.
 | UNABLE | worker | The worker cannot or must not do the task as asked. The handoff gives the reason. |
 | VERIFIED | worker, judge | A check ran in this session, after the last change. Its result shows that the statement is true. |
 | FAILED | worker, judge | A check ran in this session, after the last change. Its result shows that the statement is not true. |
-| UNVERIFIED | worker, judge | No check ran, or a change came after the check. The message says why. |
+| UNVERIFIED | worker, judge | No check ran, the check tests less than the statement, or a change came after the check. The message says why. |
 | PASS | judge | The evidence supports every claim in the handoff. |
 | FAIL | judge | A claim has no evidence, or the handoff hides a failure. |
 | GO | owner | The owner approves this one decision. |
@@ -46,7 +46,7 @@ A secret is a password, a token, a key or a connection string.
 - A check that did not run gives UNVERIFIED. It never gives DONE.
 - A check that ran and failed gives FAILED. It never gives VERIFIED.
 - A change after a check makes the result old. An old result gives UNVERIFIED.
-- VERIFIED and FAILED show the command, the exit code and the result.
+- VERIFIED and FAILED show the command or tool call, its exit code when it has one, and the result.
 - Only the owner says GO or NO-GO.
 - A GO covers one decision. It does not carry to the next decision.
 - Number the open asks. A bare GO answers number 1 only.
@@ -139,7 +139,7 @@ The handoff has these keys in this order. Use JSON with the same keys when a scr
 | summary | 1 to 3 sentences |
 | changes | Each file and what changed in it |
 | commit | `repo@sha` or `none` |
-| checks | Command, exit code, observation. Run each check after the last change. Use no pipe that hides the exit code. |
+| checks | Command or tool call, exit code when it has one, observation. Run each check after the last change. Use no pipe that hides the exit code. |
 | contract | Each ACC id with VERIFIED, FAILED or UNVERIFIED |
 | open | The work that remains and why, or `—` |
 | issues | Severity (blocking, high, low) and description. Action items only. |
@@ -201,12 +201,16 @@ No teammates table is required. The lead names its host when it calls the helper
 An unavailable provider gives `JUDGE none`. Do not substitute a local judge or another model.
 The judge does not delegate or start another judge.
 
-The judge checks four things:
+The judge checks five things:
 
 1. The evidence supports each claim.
 2. The handoff hides no failure.
 3. Each contract statement has a status.
 4. Each VERIFIED status has a check that ran after the last change. Run the check again when you can.
+5. Each VERIFIED status shows the worker's command or tool call and its result.
+
+A check that tests less than its statement does not support VERIFIED.
+The judge's own check can confirm the worker's evidence. It cannot replace missing evidence.
 
 The first word of the judge's answer is PASS or FAIL.
 After the first word, name each claim that has no evidence and each failure that the handoff hides.
@@ -297,4 +301,4 @@ Write the requested values. Write the model that the host reports only when it d
 
 ## Optional project binding extension (package v0.7.0)
 
-A project may explicitly bind several repositories to one local record home. The resolved home overrides the repository-name default. An unbound repository retains the default; a marked but invalid binding stops writes. Shared records retain repository and check-context provenance. Only the lead publishes records through the profile's serialized publisher. A generated index locates documents and never overrides them. See [shared projects](docs/shared-projects.md). Package v0.7.0 includes this extension. The core communication rules above remain v0.6.
+A project may explicitly bind several repositories to one local record home. The resolved home overrides the repository-name default. An unbound repository retains the default; a marked but invalid binding stops writes. Shared records retain repository and check-context provenance. Only the lead publishes records through the profile's serialized publisher. A generated index locates documents and never overrides them. See [shared projects](docs/shared-projects.md). Package v0.7.0 includes this extension. The core communication rules above are v0.7.

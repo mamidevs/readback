@@ -6,7 +6,7 @@ A finished change tells you what exists now. It does not tell you why you chose 
 
 Start with one repository. When a project spans an API, backend, and frontend, optional project settings let those repositories use one logbook while every agent keeps working in its own code directory.
 
-**Version:** **v0.7.0** includes shared-project routing, serialized Markdown publication, and document indexing. The core communication rules remain **Readback Protocol v0.6**. The [shared-project extension](docs/protocol-0.7-draft.md) documents the shipped behavior and identifies the extended handoff envelope that remains a draft. Existing installations require an explicit update.
+**Version:** **v0.7.0** includes shared-project routing, serialized Markdown publication, and document indexing. The core communication rules are **Readback Protocol v0.7**, which adds Amendment 08's evidence rules for the judge. The [shared-project extension](docs/protocol-0.7-draft.md) documents the shipped behavior and identifies the extended handoff envelope that remains a draft. Existing installations require an explicit update.
 
 ## What it does
 
@@ -134,7 +134,7 @@ Run this setup once. The clone uses `main`; check out the `v0.7.0` tag before co
 
 The integration selects the judge automatically. No teammates file is required. [TEAMMATES.example.md](TEAMMATES.example.md) describes optional overrides; a Codex lead must retain a Fable judge.
 
-The judge receives the contract and handoff and can read the supplied review files through its CLI. **Judging sends task context to the other model provider.** Local storage does not make model calls local. Choose the review scope with that in mind.
+The judge receives the contract, the handoff and the reviewed folder's Git HEAD, status and diff statistics, without file contents. It can read the supplied review files through its CLI. **Judging sends task context to the other model provider.** Local storage does not make model calls local. Choose the review scope with that in mind.
 
 Calls have a deadline. An unavailable model or failed call gives `JUDGE none`; there is no silent fallback. A FAIL goes back for correction and review by the same provider. The lead keeps the full response and execution metadata.
 
@@ -152,9 +152,9 @@ git diff --check
 
 The suites cover judge routing, project identity and fallback, publication conflicts and recovery, and document indexing. They do not certify every installed CLI workflow or a particular project's migration.
 
-Optional live checks are in `checks/outside-judge.sh`, `checks/resume.sh`, and `checks/resume-codex.sh`. The six cases in `evals/` exercise worker and judge behavior. Read their scripts before running them: live checks use provider accounts and create test files.
+Optional live checks are in `checks/outside-judge.sh`, `checks/resume.sh`, and `checks/resume-codex.sh`. The fourteen cases in `evals/` exercise worker, explorer and judge behavior. Read their scripts before running them: live checks use provider accounts and create test files.
 
-The protocol is an instruction layer. Use your CLI's permissions for hard execution limits. The publisher enforces its storage checks; it cannot establish that a test ran, an owner approved an action, or a handoff deserves PASS. Those claims still need evidence and review.
+The protocol is an instruction layer. Use your CLI's permissions for hard execution limits. The Claude Code plugin adds one: a hook denies Git commands that discard uncommitted work, such as `git reset --hard`, `git restore`, `git clean` and `git stash`. Codex has no equivalent yet. The publisher enforces its storage checks; it cannot establish that a test ran, an owner approved an action, or a handoff deserves PASS. Those claims still need evidence and review.
 
 This is a personal workflow with cooperating local sessions. It has no multi-user access control, cloud synchronization, hosted collaboration, or task tracker integration. The index is rebuildable; authoritative records need your own backup policy. Retiring an existing Hub requires preserved history, verified recovery material, and fresh sessions using the new routing rules.
 
@@ -167,6 +167,7 @@ This is a personal workflow with cooperating local sessions. It has no multi-use
 | [Shared projects](docs/shared-projects.md), [project identity](docs/project-identity.md) | Optional project memory and its operational contract |
 | [Shared-project extension](docs/protocol-0.7-draft.md), [schemas/](schemas/) | Shipped extension, generic data shapes, and the explicitly draft handoff envelope |
 | [output-styles/](output-styles/), [agents/](agents/), [skills/](skills/) | Claude Code instructions |
+| [hooks/](hooks/) | Claude Code hook that denies Git commands which discard work |
 | [portable/skills/](portable/skills/), [scripts/sync.py](scripts/sync.py) | Generated portable instructions and bundled helpers |
 | [scripts/project_registry.py](scripts/project_registry.py) | Project identity, validation, and routing |
 | [scripts/publish_records.py](scripts/publish_records.py) | Serialized Markdown publication and recovery |

@@ -98,7 +98,7 @@ A missing registry then permits an unrelated repository-name fallback without cr
 An empty registry behaves the same way, with generation `0`; a missing registry reports generation `null`.
 Malformed or conflicting registries always fail, even with fallback requested.
 `LEGACY_FALLBACK` is a compatibility candidate, with `write_allowed: false`; it does not grant registered project authority.
-The lead follows existing 0.6 record rules only for this explicit compatibility status.
+The lead follows the core record rules only for this explicit compatibility status.
 
 An unregistered worktree of a known Git common directory is always rejected.
 Fallback destinations overlapping registered homes or retired roots are rejected.

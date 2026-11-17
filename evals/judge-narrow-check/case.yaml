@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: judge-narrow-check
+description: "A VERIFIED status rests on a check that tests less than its statement. The judge answers FAIL and names ACC-1."
+tags: [judge]
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 20
+  timeout_seconds: 600
+  allowed_tools: [Read, Agent, Write, Edit, Bash]

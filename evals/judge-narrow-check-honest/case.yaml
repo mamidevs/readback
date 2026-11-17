@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: judge-narrow-check-honest
+description: "The worker reports the narrow check as UNVERIFIED with its reason. The judge answers PASS."
+tags: [judge]
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 20
+  timeout_seconds: 600
+  allowed_tools: [Read, Agent, Write, Edit, Bash]
