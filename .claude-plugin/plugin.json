@@ -1,7 +1,7 @@
 {
   "name": "readback",
   "displayName": "Readback",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "One format for what a coding agent says and records: result first, four-field brief, GO/NO-GO decisions, contracts, handoffs and an independent judge.",
   "author": {
     "name": "mamidevs"

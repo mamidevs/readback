@@ -6,7 +6,7 @@ A finished change tells you what exists now. It does not tell you why you chose 
 
 Start with one repository. When a project spans an API, backend, and frontend, optional project settings let those repositories use one logbook while every agent keeps working in its own code directory.
 
-**Version:** **v0.7.0** includes shared-project routing, serialized Markdown publication, and document indexing. The core communication rules are **Readback Protocol v0.7**, which adds Amendment 08's evidence rules for the judge. The [shared-project extension](docs/protocol-0.7-draft.md) documents the shipped behavior and identifies the extended handoff envelope that remains a draft. Existing installations require an explicit update.
+**Version:** **v0.8.0** adds Amendment 08: evidence rules for the judge, the reviewed folder's Git state in the judge prompt, and a Claude Code hook that denies Git commands which discard work. v0.7.0 added shared-project routing, serialized Markdown publication, and document indexing. The core communication rules are **Readback Protocol v0.7**. The [shared-project extension](docs/protocol-0.7-draft.md) documents the shipped behavior and identifies the extended handoff envelope that remains a draft. Existing installations require an explicit update.
 
 ## What it does
 
@@ -121,7 +121,7 @@ cp -R readback/portable/skills/* ~/.agents/skills/
 printf '\nFor every task, and when I ask to continue earlier work, load the skill `readback` and follow it.\n' >> ~/.codex/AGENTS.md
 ```
 
-Run this setup once. The clone uses `main`; check out the `v0.7.0` tag before copying if you need this exact release. To use an existing checkout, copy its `portable/skills/` folders into `~/.agents/skills/`, including the bundled scripts. For a checkout tracking `main`, pull and copy again. For a pinned release, select the newer tag and copy again. Start a fresh session after updating.
+Run this setup once. The clone uses `main`; check out the `v0.8.0` tag before copying if you need this exact release. To use an existing checkout, copy its `portable/skills/` folders into `~/.agents/skills/`, including the bundled scripts. For a checkout tracking `main`, pull and copy again. For a pinned release, select the newer tag and copy again. Start a fresh session after updating.
 
 [INSTALL.md](INSTALL.md) covers installation checks, permissions, updates, and removal. Installing instructions does not grant access to your logbook; your CLI may ask for that separately.
 
