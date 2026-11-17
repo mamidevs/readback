@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:readback:registry:1",
+  "title": "Readback registry v1",
+  "type": "object",
+  "properties": {
+    "registry_version": {
+      "const": 1
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "project_uuid": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "home": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^/",
+            "description": "Absolute canonical local path. Runtime checks canonicalization, physical identity and path safety."
+          },
+          "home_identity": {
+            "type": "object",
+            "properties": {
+              "device": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "inode": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "device",
+              "inode"
+            ],
+            "additionalProperties": false
+          },
+          "home_uuid": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "protocol_version": {
+            "const": "0.7"
+          },
+          "profile_version": {
+            "const": 1
+          },
+          "activation_state": {
+            "enum": [
+              "STAGED",
+              "ACTIVE"
+            ],
+            "description": "ACTIVE requires a matching profile with explicit markdown-single-writer storage; runtime enforces this cross-file rule."
+          },
+          "profile_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "repositories": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "repo_uuid": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "root": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^/",
+                  "description": "Absolute canonical local path. Runtime checks canonicalization, physical identity and path safety."
+                },
+                "root_identity": {
+                  "type": "object",
+                  "properties": {
+                    "device": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "inode": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "device",
+                    "inode"
+                  ],
+                  "additionalProperties": false
+                },
+                "git_common_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^/",
+                  "description": "Absolute canonical local path. Runtime checks canonicalization, physical identity and path safety."
+                },
+                "git_common_dir_identity": {
+                  "type": "object",
+                  "properties": {
+                    "device": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "inode": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "device",
+                    "inode"
+                  ],
+                  "additionalProperties": false
+                },
+                "worktrees": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "root": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "^/",
+                        "description": "Absolute canonical local path. Runtime checks canonicalization, physical identity and path safety."
+                      },
+                      "identity": {
+                        "type": "object",
+                        "properties": {
+                          "device": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "inode": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "required": [
+                          "device",
+                          "inode"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "root",
+                      "identity"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "repo_uuid",
+                "root",
+                "root_identity",
+                "git_common_dir",
+                "git_common_dir_identity",
+                "worktrees"
+              ],
+              "additionalProperties": false
+            },
+            "uniqueItems": true
+          },
+          "retired_roots": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^/",
+              "description": "Absolute canonical local path. Runtime checks canonicalization, physical identity and path safety."
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "project_uuid",
+          "slug",
+          "home",
+          "home_identity",
+          "home_uuid",
+          "protocol_version",
+          "profile_version",
+          "activation_state",
+          "profile_sha256",
+          "repositories",
+          "retired_roots"
+        ],
+        "additionalProperties": false
+      },
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "registry_version",
+    "generation",
+    "projects"
+  ],
+  "additionalProperties": false,
+  "description": "STAGED-only W1 structure. Runtime additionally enforces filesystem, Git, cross-entry uniqueness, profile hashes and generation transitions."
+}

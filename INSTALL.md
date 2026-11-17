@@ -122,3 +122,7 @@ Remove: delete the four folders from `~/.agents/skills/` and the line from `~/.c
 ## Other CLIs
 
 No package exists for other CLIs. A CLI that reads Agent Skills can try `portable/skills/`. Nothing checks it.
+
+## Optional shared project memory
+
+Several code repositories can share one local project logbook without changing their working directories. See [shared projects](docs/shared-projects.md) and [project identity](docs/project-identity.md). Install the updated portable lead skill and its bundled scripts together. Existing unbound repositories retain the default behavior. A marked repository with a missing or invalid binding stops instead of creating a second logbook.

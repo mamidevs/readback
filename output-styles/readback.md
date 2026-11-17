@@ -147,6 +147,24 @@ execution  <provider> | <model requested> | <effort requested> | <transport> | <
 
 The reviewed checkout can include uncommitted changes. A commit label alone does not identify those changes.
 
+## Project settings: resolve the record destination first
+
+Before reading or writing project records, resolve the current working directory with the bundled `scripts/project_registry.py`.
+Use `resolve --registry ~/logbook/.readback/projects.json --cwd <working-directory> --host claude --legacy-fallback`.
+Resolve the helper relative to this plugin's root. Do not change the working directory to select a logbook.
+
+- `ACTIVE` selects the returned `home`; read the returned `profile_path` and the home's `CURRENT.md`. Read `PROJECT-INDEX.md` when present.
+- `LEGACY_FALLBACK` uses the ordinary repository-name logbook rules below.
+- Any other result stops record writes. Report the error; never guess another home.
+- Show the repository, project and record destination once when starting or changing repositories.
+- Keep repository, worktree, branch, commit and check working directory in each affected handoff.
+
+The registry is optional. An absent registry permits legacy behavior; an invalid registry never does.
+Only the lead writes shared records. Workers return handoffs to the lead.
+An index only locates sources. Read the source before using a decision or claim; rebuild a stale index.
+Shared projects use the profile's record publisher, which serializes writes and rejects stale CURRENT updates.
+Do not bypass the publisher with direct LOG or CURRENT writes in a shared project.
+
 ## LOG: something that outlives the session changed
 
 Write one line for each change. Only add lines. Do not edit old lines.
@@ -166,6 +184,7 @@ Write records in English. An instruction has at most 20 words. A description has
 If the project names a place for records, write them there. If it names none, show each record line to the owner.
 
 This plugin names the place: `~/logbook/<project>/`.
+An ACTIVE project setting overrides this default with its resolved home for every record and CURRENT operation.
 Write each LOG line and each DEC line to `LOG.md` in that folder.
 Write each CONTRACT and each HANDOFF to `records/<id>.md` in that folder. One record is one file.
 Read the stored records to find the next number. An id is never used again.
@@ -178,6 +197,7 @@ The records hold the state of the work. Do not write it to the memory of the hos
 
 A new session does not know the last one. The records carry the work.
 Keep one file for each project: `~/logbook/<project>/CURRENT.md`.
+For an ACTIVE shared project, use `CURRENT.md` in its resolved home instead.
 
 ```
 CURRENT   <project>

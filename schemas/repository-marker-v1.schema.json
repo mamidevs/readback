@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:readback:repository-marker:1",
+  "title": "Readback local repository marker v1",
+  "type": "object",
+  "properties": {
+    "marker_version": {
+      "const": 1
+    },
+    "project_uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "repo_uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    }
+  },
+  "required": [
+    "marker_version",
+    "project_uuid",
+    "repo_uuid"
+  ],
+  "additionalProperties": false,
+  "description": "Local .readback-project.json marker. A copied marker does not register a new location; runtime requires a matching physical root and registry binding."
+}

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:readback:legacy-reference:1",
+  "title": "Readback qualified legacy reference v1",
+  "type": "string",
+  "pattern": "^legacy:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:[0-9a-f]{64}:[^#]+#[^#]+$",
+  "description": "Shape only. Runtime requires canonical UTF-8 percent escaping and rejects unsafe or empty path components and identifiers."
+}

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:readback:profile:1",
+  "title": "Readback private project profile v1",
+  "type": "object",
+  "properties": {
+    "profile_version": {
+      "const": 1
+    },
+    "profile_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "protocol_version": {
+      "const": "0.7"
+    },
+    "record_types": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "const": "DEC"
+          }
+        },
+        {
+          "contains": {
+            "const": "CON"
+          }
+        },
+        {
+          "contains": {
+            "const": "HND"
+          }
+        },
+        {
+          "contains": {
+            "const": "LOG"
+          }
+        }
+      ]
+    },
+    "core_language": {
+      "const": "en"
+    },
+    "extension_namespace": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "extensions": {
+      "type": "object",
+      "maxProperties": 1,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+      },
+      "additionalProperties": {
+        "type": "object"
+      },
+      "description": "Empty or one namespace object. Runtime requires the key to equal extension_namespace; JSON Schema alone cannot express that equality."
+    }
+  },
+  "required": [
+    "profile_version",
+    "profile_id",
+    "protocol_version",
+    "record_types",
+    "core_language",
+    "extension_namespace",
+    "extensions"
+  ],
+  "additionalProperties": false,
+  "description": "Generic profile envelope. ACTIVE runtime resolution requires extensions[extension_namespace].storage to equal markdown-single-writer. Other private acceptance policies remain declarative."
+}

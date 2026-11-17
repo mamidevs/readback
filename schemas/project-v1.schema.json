@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:readback:project:1",
+  "title": "Readback center identity v1",
+  "type": "object",
+  "properties": {
+    "project_version": {
+      "const": 1
+    },
+    "project_uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "home_uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "protocol_version": {
+      "const": "0.7"
+    },
+    "profile_version": {
+      "const": 1
+    },
+    "profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "activation_state": {
+      "enum": [
+        "STAGED",
+        "ACTIVE"
+      ],
+      "description": "ACTIVE requires a matching profile with explicit markdown-single-writer storage; runtime enforces this cross-file rule."
+    }
+  },
+  "required": [
+    "project_version",
+    "project_uuid",
+    "home_uuid",
+    "protocol_version",
+    "profile_version",
+    "profile_sha256",
+    "activation_state"
+  ],
+  "additionalProperties": false,
+  "description": "Center identity must match its unique registry binding. Profile SHA-256 covers exact profile.json bytes."
+}
