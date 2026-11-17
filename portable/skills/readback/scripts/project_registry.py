@@ -580,6 +580,35 @@ def _resolution(project, registry, host, cwd, git, repo_uuid=None):
             "write_allowed": project["activation_state"] == "ACTIVE", **_provenance(cwd, git)}
 
 
+def _linked_main_name(directory):
+    """Name of the main worktree's folder for a linked worktree whose main root counts, else None."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    prefix = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-C", str(directory)]
+    try:
+        ident = subprocess.run(prefix + ["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir"],
+                               capture_output=True, timeout=5, env=env, check=False)
+        if ident.returncode != 0:
+            return None
+        lines = ident.stdout.split(b"\n")
+        if len(lines) != 3 or lines[2] != b"":
+            return None
+        if os.path.realpath(os.fsdecode(lines[0])) == os.path.realpath(os.fsdecode(lines[1])):
+            return None
+        listing = subprocess.run(prefix + ["worktree", "list", "--porcelain", "-z"],
+                                 capture_output=True, timeout=5, env=env, check=False)
+        if listing.returncode != 0:
+            return None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    record = listing.stdout.split(b"\0\0")[0].split(b"\0")
+    if not record or not record[0].startswith(b"worktree ") or b"bare" in record[1:]:
+        return None
+    main = os.fsdecode(record[0][len(b"worktree "):])
+    if not main or not os.path.exists(os.path.join(main, ".git")):
+        return None
+    return Path(main).name or None
+
+
 def resolve_project(registry_path, cwd, host, inspect_staged=False, logbook=None, legacy_fallback=False):
     require(host in {"codex", "claude"}, "Unsupported host")
     require(type(inspect_staged) is bool, "Inspection flag must be boolean")
@@ -640,7 +669,8 @@ def resolve_project(registry_path, cwd, host, inspect_staged=False, logbook=None
     root = Path(git[0]) if git else cwd
     try:
         base = Path(logbook).resolve() if logbook is not None else Path.home() / "logbook"
-        destination = (base / root.name).resolve()
+        name = (_linked_main_name(cwd) if git else None) or root.name
+        destination = (base / name).resolve()
     except (OSError, RuntimeError) as exc:
         raise RegistryError("INVALID", "Fallback path is unavailable") from exc
     for parent in [destination] + list(destination.parents):
