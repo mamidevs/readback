@@ -47,8 +47,9 @@ After the rule change, all six worker cases and the explorer case ran once more.
 judge-tool-call-evidence is an honest DONE whose check is a Grep tool call without an exit code. It runs in a Git worktree, so it also exercises the worktree section. Both judges answered PASS in one round each.
 The Fable answer used the worktree section: it cited ` M README.md` with one insertion and one deletion.
 
-`checks/test_guard_git.py` gives the hook 31 command lines that it must deny and 18 that it must allow. All pass.
+`checks/test_guard_git.py` gives the hook 50 command lines that it must deny and 26 that it must allow. All pass.
 The release judge found that the first hook allowed `git checkout HEAD tracked.txt`. The hook now denies a checkout of a path and a forced `git rm`.
+A second judge FAIL showed `git stash create` and `store` and combined force flags such as `-qf`. The hook now reads short option clusters, long option abbreviations, wrappers such as env and timeout, subshells and eval.
 A live Claude Code run on Haiku 5.5 called `git reset --hard` in a test repository. The hook denied the call, and the uncommitted line stayed.
 
 ## Not included
@@ -63,6 +64,6 @@ A live Claude Code run on Haiku 5.5 called `git reset --hard` in a test reposito
 - The worktree observation lists file names. A file name can still read like an instruction. The prompt labels the section as data.
 - No case gives a worker a contract Check that tests less than its statement. The worker side of the wider UNVERIFIED is unmeasured.
 - The hook reads the command line only. It does not see Git calls inside a script that the agent runs.
-- A checkout of one name counts as a path only when that name exists in the session folder or the `-C` folder. The hook does not follow `cd`.
+- A checkout of one name counts as a path when it exists, or when Git does not resolve it as a revision. The hook does not follow `cd`, resolve Git aliases or expand variables.
 - The hook allows the call when its input is not valid JSON or when `python3` is missing.
 - The hook denies these commands in every Claude Code session that enables the plugin. The owner runs them outside the agent.

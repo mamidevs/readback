@@ -45,6 +45,23 @@ DENIED = [
     "sudo git clean -f",
     "ls\ngit reset --hard",
     "git stash 'unbalanced",
+    "git stash create",
+    "git stash store deadbeef",
+    "git checkout -qf main",
+    "git switch -qf main",
+    "git reset --har",
+    "git checkout --forc main",
+    "git switch --discard main",
+    "git checkout --pathspec-from-file=list.txt",
+    "git rm -qf notes.txt",
+    "git restore --stag --work greet.sh",
+    "env -u HOME git reset --hard",
+    "timeout 5 git stash",
+    "nice -n 10 git clean -f",
+    "xargs git stash drop",
+    "$(which git) stash",
+    "eval \"git stash\"",
+    "(cd work; git stash)",
 ]
 
 ALLOWED = [
@@ -53,7 +70,6 @@ ALLOWED = [
     "git stash show -p",
     "git reset HEAD greet.sh",
     "git reset --soft HEAD~1",
-    "git checkout main",
     "git checkout -b feature",
     "git checkout -b feature main",
     "git rm --cached notes.txt",
@@ -62,9 +78,16 @@ ALLOWED = [
     "git clean -n",
     "git clean --dry-run -d",
     "git switch main",
+    "(git status)",
     "echo 'git reset --hard'",
     "grep -n 'git stash' README.md",
     "python3 -m unittest",
+    "git clean -nfd",
+    "git clean --dry -d",
+    "git restore --stag greet.sh",
+    "git checkout -qb feature",
+    "git switch -c feature",
+    "echo done && git status",
 ]
 
 
@@ -107,13 +130,21 @@ class GuardGitTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             base = Path(folder)
             (base / "tracked.txt").write_text("x\n")
+            (base / "deleted.txt").write_text("x\n")
+            git = ["git", "-C", str(base), "-c", "user.email=t@example.invalid", "-c", "user.name=t"]
+            subprocess.run(git + ["init", "-q", "-b", "main"], check=True)
+            subprocess.run(git + ["add", "."], check=True)
+            subprocess.run(git + ["commit", "-q", "-m", "base"], check=True)
+            (base / "deleted.txt").unlink()
             (base / "sub").mkdir()
             (base / "sub" / "file.txt").write_text("x\n")
-            for command in ("git checkout tracked.txt", "git -C sub checkout file.txt"):
+            for command in ("git checkout tracked.txt", "git -C sub checkout file.txt",
+                            "git --work-tree=sub checkout file.txt", "git checkout deleted.txt"):
                 with self.subTest(command=command):
                     self.assert_denied(bash(command, cwd=base), command)
-            result = bash("git checkout main", cwd=base)
-            self.assertEqual(result.stdout, "", "a branch name was denied")
+            for command in ("git checkout main", "git checkout HEAD~0", "git checkout -b feature main"):
+                with self.subTest(command=command):
+                    self.assertEqual(bash(command, cwd=base).stdout, "", "a revision was denied: " + command)
 
     def test_sub_agent_is_told_to_return_blocked(self):
         result = bash("git reset --hard", agent_type="readback:worker")

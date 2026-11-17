@@ -4,82 +4,100 @@
 Claude Code runs this hook before each Bash call and passes the hook input as JSON on stdin.
 A match prints a deny decision. Any other input prints nothing, so the call goes ahead.
 The hook reads the command line only. A script that runs Git inside itself is not seen.
-A checkout of one name counts as a path when that name exists in the session folder or the -C folder.
+A checkout of one name counts as a path when it exists in the session, -C or --work-tree folder,
+or when Git there does not resolve it as a revision. The hook does not follow cd or resolve Git aliases.
 """
 
 import json
 import os
 import re
 import shlex
+import subprocess
 import sys
 
 
-OPERATOR = set(";|&()<>")
-WRAPPERS = {"command", "sudo", "env", "nohup", "time", "exec", "nice"}
+OPERATOR = set(";|&<>")
+GROUPING = set("()")
 SHELLS = {"bash", "sh", "zsh", "dash", "ksh"}
 GIT_OPTIONS_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path",
                           "--super-prefix", "--config-env"}
-ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 FALLBACK = re.compile(
-    r"\bgit\b[^;&|\n]*?\b(reset\b[^;&|\n]*--hard|stash\b|clean\b|restore\b"
-    r"|checkout\b[^;&|\n]*\s(--|\.)(\s|$)|switch\b[^;&|\n]*--discard-changes)")
+    r"\bgit\b[^;&|\n]*?\b(reset\b[^;&|\n]*--h|stash\b|clean\b|restore\b|rm\b|checkout\b|switch\b)")
 
 
-def discarding(sub, args, base):
-    """Return True when this Git subcommand can discard uncommitted work.
-
-    base is the folder that Git runs in. It tells a path from a branch name for checkout.
-    """
-    short = "".join(a[1:] for a in args if a.startswith("-") and not a.startswith("--"))
-    if sub == "reset":
-        return "--hard" in args
-    if sub == "checkout":
-        if "--" in args or "." in args or "-f" in args or "--force" in args:
+def long_option(args, name):
+    """True when an argument is the long option or an abbreviation that Git accepts for it."""
+    for arg in args:
+        option = arg.split("=", 1)[0]
+        if option.startswith("--") and len(option) > 3 and name.startswith(option):
             return True
-        if any(a in args for a in ("-b", "-B", "--orphan")):
-            return False
-        names = [a for a in args if not a.startswith("-")]
-        # Two names are a tree and a path. One name that exists here is a path, not a branch.
-        return len(names) >= 2 or (len(names) == 1 and os.path.lexists(os.path.join(base, names[0])))
-    if sub == "rm":
-        return "-f" in args or "--force" in args or "f" in short
-    if sub == "switch":
-        return "--discard-changes" in args or "-f" in args or "--force" in args
-    if sub == "restore":
-        staged = "--staged" in args or "S" in short
-        worktree = "--worktree" in args or "W" in short
-        return worktree or not staged
-    if sub == "clean":
-        return not ("--dry-run" in args or "n" in short)
-    if sub == "stash":
-        action = args[0] if args and not args[0].startswith("-") else "push"
-        return action not in ("list", "show", "create", "store")
     return False
 
 
-def git_call(words, cwd):
-    """Return the denied command text for one simple command, or None."""
-    words = list(words)
-    while words and (ASSIGNMENT.match(words[0]) or words[0] in WRAPPERS or words[0].startswith("-")):
-        words.pop(0)
-    if not words:
-        return None
-    program = words[0].rsplit("/", 1)[-1]
-    if program in SHELLS:
-        for index, word in enumerate(words[1:-1], start=1):
-            if word.startswith("-") and not word.startswith("--") and "c" in word:
-                return check(words[index + 1], cwd)
-        return None
-    if program != "git":
-        return None
-    rest = words[1:]
+def short_flags(args):
+    """The letters of every short option cluster, such as "qf" for -qf."""
+    return "".join(a[1:] for a in args if a.startswith("-") and not a.startswith("--") and len(a) > 1)
+
+
+def is_revision(base, name):
+    """True when Git in base resolves name to a commit. Without Git or a repository, a missing path counts."""
+    try:
+        result = subprocess.run(
+            ["git", "--no-optional-locks", "-C", base, "rev-parse", "--verify", "--quiet", name + "^{commit}"],
+            capture_output=True, timeout=5, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return not os.path.lexists(os.path.join(base, name))
+    if result.returncode in (0, 1):
+        return result.returncode == 0
+    return not os.path.lexists(os.path.join(base, name))
+
+
+def discarding(sub, args, base):
+    """Return True when this Git subcommand can discard uncommitted work."""
+    short = short_flags(args)
+    force = "f" in short or long_option(args, "--force")
+    if sub == "reset":
+        return long_option(args, "--hard")
+    if sub == "checkout":
+        if force or "--" in args or "." in args or long_option(args, "--pathspec-from-file"):
+            return True
+        if "b" in short or "B" in short or long_option(args, "--orphan"):
+            return False
+        names = [a for a in args if not a.startswith("-")]
+        # Two names are a tree and a path. One name is a path when it exists or is not a revision.
+        if len(names) >= 2:
+            return True
+        if len(names) == 1:
+            return os.path.lexists(os.path.join(base, names[0])) or not is_revision(base, names[0])
+        return False
+    if sub == "switch":
+        return force or long_option(args, "--discard-changes")
+    if sub == "rm":
+        return force
+    if sub == "restore":
+        staged = "S" in short or long_option(args, "--staged")
+        worktree = "W" in short or long_option(args, "--worktree")
+        return worktree or not staged
+    if sub == "clean":
+        return not ("n" in short or long_option(args, "--dry-run"))
+    if sub == "stash":
+        action = args[0] if args and not args[0].startswith("-") else "push"
+        return action not in ("list", "show")
+    return False
+
+
+def git_call(rest, cwd):
+    """Return the denied text for the words after `git`, or None."""
+    rest = list(rest)
     base = cwd
     while rest and rest[0].startswith("-"):
         option = rest.pop(0)
-        if option in GIT_OPTIONS_WITH_VALUE and rest:
+        name, _, value = option.partition("=")
+        if name in GIT_OPTIONS_WITH_VALUE and not value and rest:
             value = rest.pop(0)
-            if option == "-C":
-                base = os.path.join(base, value)
+        if name in ("-C", "--work-tree") and value:
+            base = os.path.join(base, value)
     if not rest:
         return None
     sub, args = rest[0], rest[1:]
@@ -88,9 +106,30 @@ def git_call(words, cwd):
     return None
 
 
+def simple_command(words, cwd):
+    """Check one simple command. Git can follow wrappers such as env, timeout, nice or xargs."""
+    for index, word in enumerate(words):
+        program = word.rsplit("/", 1)[-1]
+        if program == "git":
+            found = git_call(words[index + 1:], cwd)
+            if found:
+                return found
+        elif program == "eval":
+            return check(" ".join(words[index + 1:]), cwd)
+        elif program in SHELLS:
+            for position in range(index + 1, len(words) - 1):
+                option = words[position]
+                if option.startswith("-") and not option.startswith("--") and "c" in option:
+                    found = check(words[position + 1], cwd)
+                    if found:
+                        return found
+                    break
+    return None
+
+
 def check(command, cwd="."):
     """Return the first denied Git command inside a shell command line, or None."""
-    text = command.replace("\n", " ; ").replace("`", " ; ").replace("$(", " ; ")
+    text = command.replace("\n", " ; ").replace("`", " ")
     try:
         lexer = shlex.shlex(text, posix=True, punctuation_chars=True)
         lexer.whitespace_split = True
@@ -100,8 +139,10 @@ def check(command, cwd="."):
         return match.group(0)[:120] if match else None
     current = []
     for token in tokens + [";"]:
+        if token and set(token) <= GROUPING:
+            continue
         if token and set(token) <= OPERATOR:
-            found = git_call(current, cwd)
+            found = simple_command(current, cwd)
             if found:
                 return found
             current = []
