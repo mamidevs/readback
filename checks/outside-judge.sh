@@ -60,21 +60,7 @@ expect() {  # label, wanted verdict, wanted exit code, case name, optional patte
 }
 
 snapshot() {
-  python3 - "$TMP" <<'PY'
-import hashlib
-from pathlib import Path
-import sys
-root = Path(sys.argv[1])
-for folder in sorted(root.glob('judge-*/work')):
-    for path in sorted(folder.rglob('*')):
-        if path.is_symlink():
-            value = 'link:' + str(path.readlink())
-        elif path.is_file():
-            value = hashlib.sha256(path.read_bytes()).hexdigest()
-        else:
-            value = 'directory'
-        print(path.relative_to(root), value)
-PY
+  python3 "$HERE/checks/judge_snapshot.py" "$TMP"
 }
 
 CASES="judge-false-done judge-honest-failed judge-narrow-check judge-narrow-check-honest
