@@ -20,6 +20,7 @@ import tempfile
 from typing import NamedTuple
 import uuid
 
+sys.dont_write_bytecode = True  # the sibling imports below must leave no .pyc file next to the helper
 try:
     import review_capture
     import review_receipt
@@ -373,8 +374,13 @@ def start_receipt(repo, route, rules, inputs):
     if review_receipt is None or review_capture is None:
         return {"line": none_receipt("modules not available")}
     contract, handoff, raw_contract, raw_handoff = inputs
-    info = review_receipt.repository_info(repo)
-    common = review_capture.git_common_dir(repo)
+    try:
+        info = review_receipt.repository_info(repo)
+        common = review_capture.git_common_dir(repo)
+    except InterruptedError:
+        raise
+    except Exception:
+        return {"line": none_receipt("cannot read the repository")}
     if info is None or common is None:
         return {"line": none_receipt("not a Git worktree")}
     try:
@@ -499,7 +505,7 @@ def main(argv=None):
 
 
 def interrupted(_signum, _frame):
-    raise InterruptedError("interrupted")
+    raise KeyboardInterrupt()
 
 
 if __name__ == "__main__":
