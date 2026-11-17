@@ -4,9 +4,11 @@
 Claude Code runs this hook before each Bash call and passes the hook input as JSON on stdin.
 A match prints a deny decision. Any other input prints nothing, so the call goes ahead.
 The hook reads the command line only. A script that runs Git inside itself is not seen.
+A checkout of one name counts as a path when that name exists in the session folder or the -C folder.
 """
 
 import json
+import os
 import re
 import shlex
 import sys
@@ -23,13 +25,24 @@ FALLBACK = re.compile(
     r"|checkout\b[^;&|\n]*\s(--|\.)(\s|$)|switch\b[^;&|\n]*--discard-changes)")
 
 
-def discarding(sub, args):
-    """Return True when this Git subcommand can discard uncommitted work."""
+def discarding(sub, args, base):
+    """Return True when this Git subcommand can discard uncommitted work.
+
+    base is the folder that Git runs in. It tells a path from a branch name for checkout.
+    """
     short = "".join(a[1:] for a in args if a.startswith("-") and not a.startswith("--"))
     if sub == "reset":
         return "--hard" in args
     if sub == "checkout":
-        return "--" in args or "." in args or "-f" in args or "--force" in args
+        if "--" in args or "." in args or "-f" in args or "--force" in args:
+            return True
+        if any(a in args for a in ("-b", "-B", "--orphan")):
+            return False
+        names = [a for a in args if not a.startswith("-")]
+        # Two names are a tree and a path. One name that exists here is a path, not a branch.
+        return len(names) >= 2 or (len(names) == 1 and os.path.lexists(os.path.join(base, names[0])))
+    if sub == "rm":
+        return "-f" in args or "--force" in args or "f" in short
     if sub == "switch":
         return "--discard-changes" in args or "-f" in args or "--force" in args
     if sub == "restore":
@@ -44,7 +57,7 @@ def discarding(sub, args):
     return False
 
 
-def git_call(words):
+def git_call(words, cwd):
     """Return the denied command text for one simple command, or None."""
     words = list(words)
     while words and (ASSIGNMENT.match(words[0]) or words[0] in WRAPPERS or words[0].startswith("-")):
@@ -55,24 +68,27 @@ def git_call(words):
     if program in SHELLS:
         for index, word in enumerate(words[1:-1], start=1):
             if word.startswith("-") and not word.startswith("--") and "c" in word:
-                return check(words[index + 1])
+                return check(words[index + 1], cwd)
         return None
     if program != "git":
         return None
     rest = words[1:]
+    base = cwd
     while rest and rest[0].startswith("-"):
         option = rest.pop(0)
         if option in GIT_OPTIONS_WITH_VALUE and rest:
-            rest.pop(0)
+            value = rest.pop(0)
+            if option == "-C":
+                base = os.path.join(base, value)
     if not rest:
         return None
     sub, args = rest[0], rest[1:]
-    if discarding(sub, args):
+    if discarding(sub, args, base):
         return " ".join(["git", sub, *args])[:120]
     return None
 
 
-def check(command):
+def check(command, cwd="."):
     """Return the first denied Git command inside a shell command line, or None."""
     text = command.replace("\n", " ; ").replace("`", " ; ").replace("$(", " ; ")
     try:
@@ -85,7 +101,7 @@ def check(command):
     current = []
     for token in tokens + [";"]:
         if token and set(token) <= OPERATOR:
-            found = git_call(current)
+            found = git_call(current, cwd)
             if found:
                 return found
             current = []
@@ -104,7 +120,8 @@ def main():
     command = (event.get("tool_input") or {}).get("command")
     if not isinstance(command, str):
         return 0
-    found = check(command)
+    cwd = event.get("cwd") if isinstance(event.get("cwd"), str) else "."
+    found = check(command, cwd)
     if not found:
         return 0
     if event.get("agent_type"):

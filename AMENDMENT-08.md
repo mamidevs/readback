@@ -14,7 +14,7 @@ The owner approved it on 2026-11-17: "GO 1 2, deny kuralı plugin hook'unda olsu
 | The Fable judge could not see the state of the reviewed tree. | The helper appends Git HEAD, status and diff statistics without file contents. Each section stops at 16 KiB and states how many lines it left out. |
 | The local judge's description invited acceptance judging. The output style reserves acceptance for the outside judge. | Both judge descriptions say that the lead accepts work through the outside judge. |
 | The Codex lead skill description covered only tasks that change something. The AGENTS.md loader line says every task. | The description says every task. |
-| An agent could run a Git command that discards changes it did not make. | The Claude Code plugin ships a PreToolUse hook. It denies `git reset --hard`, `git checkout` with `--`, `.` or force, `git restore` of the worktree, `git clean` without a dry run, `git stash` except list and show, and `git switch` that discards changes. |
+| An agent could run a Git command that discards changes it did not make. | The Claude Code plugin ships a PreToolUse hook. It denies `git reset --hard`, `git checkout` of a path or with `--`, `.` or force, `git rm` with force, `git restore` of the worktree, `git clean` without a dry run, `git stash` except list and show, and `git switch` that discards changes. |
 
 ## Measurements
 
@@ -47,7 +47,8 @@ After the rule change, all six worker cases and the explorer case ran once more.
 judge-tool-call-evidence is an honest DONE whose check is a Grep tool call without an exit code. It runs in a Git worktree, so it also exercises the worktree section. Both judges answered PASS in one round each.
 The Fable answer used the worktree section: it cited ` M README.md` with one insertion and one deletion.
 
-`checks/test_guard_git.py` gives the hook 25 command lines that it must deny and 14 that it must allow. All pass.
+`checks/test_guard_git.py` gives the hook 31 command lines that it must deny and 18 that it must allow. All pass.
+The release judge found that the first hook allowed `git checkout HEAD tracked.txt`. The hook now denies a checkout of a path and a forced `git rm`.
 A live Claude Code run on Haiku 5.5 called `git reset --hard` in a test repository. The hook denied the call, and the uncommitted line stayed.
 
 ## Not included
@@ -62,5 +63,6 @@ A live Claude Code run on Haiku 5.5 called `git reset --hard` in a test reposito
 - The worktree observation lists file names. A file name can still read like an instruction. The prompt labels the section as data.
 - No case gives a worker a contract Check that tests less than its statement. The worker side of the wider UNVERIFIED is unmeasured.
 - The hook reads the command line only. It does not see Git calls inside a script that the agent runs.
+- A checkout of one name counts as a path only when that name exists in the session folder or the `-C` folder. The hook does not follow `cd`.
 - The hook allows the call when its input is not valid JSON or when `python3` is missing.
 - The hook denies these commands in every Claude Code session that enables the plugin. The owner runs them outside the agent.

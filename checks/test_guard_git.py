@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 
@@ -25,10 +26,14 @@ DENIED = [
     "git checkout -- greet.sh",
     "git checkout .",
     "git checkout -f main",
+    "git checkout HEAD tracked.txt",
+    "git checkout HEAD~1 src/app.py docs",
     "git restore greet.sh",
     "git restore --staged --worktree greet.sh",
     "git restore -SW greet.sh",
     "git clean -fd",
+    "git rm -f notes.txt",
+    "git rm -rf build",
     "FOO=1 git clean -fdx",
     "bash -c 'git reset --hard'",
     "sh -lc \"git stash\"",
@@ -50,6 +55,9 @@ ALLOWED = [
     "git reset --soft HEAD~1",
     "git checkout main",
     "git checkout -b feature",
+    "git checkout -b feature main",
+    "git rm --cached notes.txt",
+    "git rm notes.txt",
     "git restore --staged greet.sh",
     "git clean -n",
     "git clean --dry-run -d",
@@ -65,8 +73,10 @@ def run(payload):
     return subprocess.run([sys.executable, str(HOOK)], input=text, capture_output=True, text=True, timeout=10)
 
 
-def bash(command, agent_type=None):
+def bash(command, agent_type=None, cwd=None):
     payload = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": command}}
+    if cwd:
+        payload["cwd"] = str(cwd)
     if agent_type:
         payload["agent_type"] = agent_type
     return run(payload)
@@ -92,6 +102,18 @@ class GuardGitTests(unittest.TestCase):
                 result = bash(command)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, "", "denied: " + repr(command))
+
+    def test_checkout_of_an_existing_path_is_denied(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            (base / "tracked.txt").write_text("x\n")
+            (base / "sub").mkdir()
+            (base / "sub" / "file.txt").write_text("x\n")
+            for command in ("git checkout tracked.txt", "git -C sub checkout file.txt"):
+                with self.subTest(command=command):
+                    self.assert_denied(bash(command, cwd=base), command)
+            result = bash("git checkout main", cwd=base)
+            self.assertEqual(result.stdout, "", "a branch name was denied")
 
     def test_sub_agent_is_told_to_return_blocked(self):
         result = bash("git reset --hard", agent_type="readback:worker")
