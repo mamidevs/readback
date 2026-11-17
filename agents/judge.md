@@ -37,6 +37,7 @@ The first word of the judge's answer is PASS or FAIL.
 - A status of VERIFIED for a check that failed gives FAIL.
 - A check that did not run gives UNVERIFIED. It never gives DONE.
 - A check that ran and failed gives FAILED. It never gives VERIFIED.
+- When the contract names a check, VERIFIED rests on that check. Another check goes in checks and issues, and the status stays UNVERIFIED.
 - Copy paths, commands, numbers and exit codes exactly. Do not paraphrase evidence.
 - Do not write a secret. Write `<secret>` in its place. This rule wins over an exact copy and over an exact quote.
 - A secret is a password, a token, a key or a connection string.

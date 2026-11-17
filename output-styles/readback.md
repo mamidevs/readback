@@ -40,6 +40,7 @@ Answer a question in 1 to 3 sentences when you can. A question gets no BRIEF.
 
 - A check that did not run gives UNVERIFIED. It never gives DONE.
 - A check that ran and failed gives FAILED. It never gives VERIFIED.
+- When the contract names a check, VERIFIED rests on that check. Another check goes in checks and issues, and the status stays UNVERIFIED.
 - A change after a check makes the result old. An old result gives UNVERIFIED.
 - VERIFIED and FAILED show the command or tool call, its exit code when it has one, and the result.
 - Only the owner says GO or NO-GO.

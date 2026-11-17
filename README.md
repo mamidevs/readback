@@ -152,7 +152,7 @@ git diff --check
 
 The suites cover judge routing, project identity and fallback, publication conflicts and recovery, and document indexing. They do not certify every installed CLI workflow or a particular project's migration.
 
-Optional live checks are in `checks/outside-judge.sh`, `checks/resume.sh`, and `checks/resume-codex.sh`. The fourteen cases in `evals/` exercise worker, explorer and judge behavior. Read their scripts before running them: live checks use provider accounts and create test files.
+Optional live checks are in `checks/outside-judge.sh`, `checks/resume.sh`, and `checks/resume-codex.sh`. The sixteen cases in `evals/` exercise worker, explorer and judge behavior. Read their scripts before running them: live checks use provider accounts and create test files.
 
 The protocol is an instruction layer. Use your CLI's permissions for hard execution limits. readback adds one: a hook denies Git commands that discard uncommitted work, such as `git reset --hard`, `git restore`, `git clean` and `git stash`. The Claude Code plugin enables it. Codex runs the same script after you add it to `~/.codex/hooks.json` and trust it; see [INSTALL](INSTALL.md#git-guard-for-codex). The hook reads the command line only, and a hook that times out lets the command run. The publisher enforces its storage checks; it cannot establish that a test ran, an owner approved an action, or a handoff deserves PASS. Those claims still need evidence and review.
 
