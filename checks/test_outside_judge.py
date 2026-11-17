@@ -284,7 +284,7 @@ class OutsideJudgeTests(unittest.TestCase):
     @unittest.skipUnless(hasattr(os, "fork"), "process-group cleanup is POSIX")
     def test_timeout_kills_ignored_term_and_descendant(self):
         started = time.monotonic()
-        result = self.call(extra_env={"FAKE_MODE": "timeout", "READBACK_JUDGE_SECONDS": "0.25"})
+        result = self.call(extra_env={"FAKE_MODE": "timeout", "READBACK_JUDGE_SECONDS": "1"})
         self.assert_none(result)
         self.assertIn("exceeded the deadline", result.stdout)
         self.assertLess(time.monotonic() - started, 4)
