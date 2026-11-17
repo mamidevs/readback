@@ -7,6 +7,8 @@ The hook reads the command line only. A script that runs Git inside itself is no
 A checkout of one name counts as a path when it exists in the session, -C or --work-tree folder,
 or when Git there does not resolve it as a revision. The hook does not follow cd or resolve Git aliases.
 Codex does not pass the workdir of a command, so the session folder stands in for it.
+A command that the hook does not deny and that holds a Git commit call is also observed: scripts/commit_observation.py
+appends one line to a file below the Git common directory. It prints nothing and never changes the answer.
 """
 
 import json
@@ -22,6 +24,7 @@ GROUPING = set("()")
 SHELLS = {"bash", "sh", "zsh", "dash", "ksh"}
 GIT_OPTIONS_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path",
                           "--super-prefix", "--config-env"}
+CANDIDATE = re.compile(r"\bgit\b[^;&|\n]*?\bcommit\b")
 FALLBACK = re.compile(
     r"\bgit\b[^;&|\n]*?\b(reset\b[^;&|\n]*--h|stash\b|clean\b|restore\b|rm\b|checkout\b|switch\b)")
 
@@ -171,6 +174,91 @@ def check(command, cwd="."):
     return None
 
 
+def simple_commands(command):
+    """Return the simple commands of a command line as word lists, in walk order.
+
+    Each $(...) and backtick substitution is visited first, innermost first, then the line. The body of a
+    visited substitution is removed from the text that encloses it, so each Git occurrence counts once.
+    The words after eval and the -c string of a shell are walked where they stand. A text that shlex
+    cannot split gives no simple command. A word of digits only before an operator that starts with < or >
+    is a file descriptor and is dropped. Return (simple commands, True when every visited text was split).
+    """
+    commands, pieces, position, failures = [], [], 0, []
+    start = command.find("$(")
+    while start != -1:
+        depth, index = 1, start + 2
+        while index < len(command) and depth:
+            depth += {"(": 1, ")": -1}.get(command[index], 0)
+            index += 1
+        end = index - 1 if depth == 0 else index
+        inner, whole = simple_commands(command[start + 2:end])
+        commands.extend(inner)
+        failures.extend([] if whole else [True])
+        pieces.append(command[position:start + 2])
+        position = end
+        start = command.find("$(", end)
+    pieces.append(command[position:])
+
+    def visit(match):
+        inner, whole = simple_commands(match.group(1))
+        commands.extend(inner)
+        failures.extend([] if whole else [True])
+        return " "
+
+    text = re.sub(r"`([^`]*)`", visit, "".join(pieces)).replace("\n", " ; ").replace("`", " ")
+    try:
+        lexer = shlex.shlex(text, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        tokens = list(lexer)
+    except ValueError:
+        return commands, False
+    current = []
+    for token in tokens + [";"]:
+        if token and set(token) <= GROUPING:
+            continue
+        if not (token and set(token) <= OPERATOR):
+            current.append(token)
+            continue
+        if token[0] in "<>" and current and current[-1].isascii() and current[-1].isdigit():
+            current.pop()
+        words, nested, skipped = current, [], set()
+        current = []
+        for index, word in enumerate(words):
+            program = word.split("/")[-1]
+            if program == "eval":
+                nested.append(" ".join(words[index + 1:]))
+                words = words[:index + 1]
+                break
+            if program in SHELLS:
+                for option in range(index + 1, len(words) - 1):
+                    if words[option].startswith("-") and not words[option].startswith("--") and "c" in words[option]:
+                        nested.append(words[option + 1])
+                        skipped.add(option + 1)
+                        break
+        if words:
+            commands.append([word for index, word in enumerate(words) if index not in skipped])
+        for text in nested:
+            inner, whole = simple_commands(text)
+            commands.extend(inner)
+            failures.extend([] if whole else [True])
+    return commands, not failures
+
+
+def holds_commit(commands):
+    """True when a simple command holds a word git that Git's global options and then the word commit follow."""
+    for words in commands:
+        for index, word in enumerate(words):
+            if word.split("/")[-1] != "git":
+                continue
+            position = index + 1
+            while position < len(words) and words[position].startswith("-"):
+                name, equals, _ = words[position].partition("=")
+                position += 2 if name in GIT_OPTIONS_WITH_VALUE and not equals else 1
+            if position < len(words) and words[position] == "commit":
+                return True
+    return False
+
+
 def main():
     try:
         event = json.load(sys.stdin)
@@ -184,6 +272,17 @@ def main():
     cwd = event.get("cwd") if isinstance(event.get("cwd"), str) else "."
     found = check(command, cwd)
     if not found:
+        if os.environ.get("READBACK_COMMIT_CHECK") != "off":
+            try:
+                commands, whole = simple_commands(command)
+                if holds_commit(commands) or (not whole and CANDIDATE.search(command)):
+                    here = os.path.dirname(os.path.abspath(__file__))
+                    sys.dont_write_bytecode = True
+                    sys.path[:0] = [here, os.path.join(os.path.dirname(here), "scripts")]
+                    import commit_observation
+                    commit_observation.observe(commands, whole, command, event)
+            except Exception:
+                pass
         return 0
     if event.get("agent_type"):
         reason = (f"readback blocks `{found}`. It can discard changes that you did not make. "
