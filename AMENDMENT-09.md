@@ -1,6 +1,6 @@
 # Amendment 09
 
-Status: approved by the owner on 2026-11-17. DEC-20261117-17. The protocol version number is set at release.
+Status: approved by the owner on 2026-11-17. DEC-20261117-17. The core rules stay Readback Protocol v0.7, because project settings and schemas pin protocol version 0.7. Package v0.9.0 ships this amendment.
 
 The owner asked for this work on 2026-11-17: "2 ile devam edelim" (the open item: the worker side of the wider UNVERIFIED had no case).
 The owner approved the rule on 2026-11-17: "oneriye uy".
