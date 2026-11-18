@@ -64,6 +64,15 @@ else:
 '''
 
 
+# A pair for which scripts/validate_handoff.py gives `valid` true. The ids CON-OFFLINE and HND-OFFLINE stay in the text.
+CONTRACT_TEXT = ("CON-20261117-01  CON-OFFLINE\nACC-1  Evidence must support the claim.   Check: sh a.sh\n"
+                 "Out of scope: everything else\n")
+HANDOFF_TEXT = ("id        HND-20261117-01\nfrom      worker\ndate      2026-11-17\nstate     DONE\n"
+                "readback  task: x | limits: y | done when: ACC-1\nsummary   HND-OFFLINE An offline fixture.\n"
+                "changes   none\ncommit    none\nchecks    sh a.sh | exit 0 | ok\ncontract  ACC-1 VERIFIED\n"
+                "open      -\nissues    -\nnext      Accept.\n")
+
+
 class OutsideJudgeTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="readback-offline-")
@@ -75,8 +84,8 @@ class OutsideJudgeTests(unittest.TestCase):
         self.repo.mkdir()
         self.contract = self.base / "contract 'quoted'.md"
         self.handoff = self.base / "handoff `quoted`.md"
-        self.contract.write_text("CON-OFFLINE\nACC-1 Evidence must support the claim.\n")
-        self.handoff.write_text("id HND-OFFLINE\nstate DONE\nchecks An offline fixture.\n")
+        self.contract.write_text(CONTRACT_TEXT)
+        self.handoff.write_text(HANDOFF_TEXT)
         self.record = self.base / "calls.jsonl"
         self.table = self.base / "TEAMMATES.md"
         self.env = os.environ.copy()
@@ -84,8 +93,13 @@ class OutsideJudgeTests(unittest.TestCase):
                     "READBACK_JUDGE_ACTIVE", "ANTHROPIC_DEFAULT_FABLE_MODEL",
                     "CLAUDE_CODE_EFFORT_LEVEL"):
             self.env.pop(key, None)
+        (self.base / "home").mkdir()
+        (self.base / "gitbin").mkdir()  # the settings lookup of the helper runs Git
+        (self.base / "gitbin" / "git").symlink_to(shutil.which("git"))
+        for key in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID"):
+            self.env.pop(key, None)
         self.env.update({
-            "PATH": str(self.bin), "READBACK_TEAMMATES": str(self.table),
+            "HOME": os.path.realpath(self.base / "home"), "PATH": str(self.bin) + os.pathsep + str(self.base / "gitbin"), "READBACK_TEAMMATES": str(self.table),
             "READBACK_JUDGE_SECONDS": "3", "FAKE_RECORD": str(self.record),
             "FAKE_CHILD_PID": str(self.base / "child.pid"),
             "FAKE_HEARTBEAT": str(self.base / "heartbeat"),
@@ -299,7 +313,7 @@ class OutsideJudgeTests(unittest.TestCase):
         self.assertEqual(heartbeat.stat().st_size, size, "descendant kept running after the timeout")
 
     def test_large_prompt_uses_stdin_and_paths_remain_literal(self):
-        self.contract.write_text("CON-LARGE\n" + "x" * 200000)
+        self.contract.write_text(CONTRACT_TEXT.replace("CON-OFFLINE", "CON-LARGE " + "x" * 200000))
         result = self.call("claude")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         call = self.calls()[0]
@@ -310,7 +324,9 @@ class OutsideJudgeTests(unittest.TestCase):
     def test_bundled_rules_and_wrapper_work_outside_source_repository(self):
         bundle = self.base / "bundle 'quoted'"
         bundle.mkdir()
-        shutil.copy2(HELPER, bundle / HELPER.name)
+        for name in ("outside_judge.py", "review_receipt.py", "review_capture.py", "validate_handoff.py",
+                     "readback_settings.py", "readback_session.py", "project_registry.py"):
+            shutil.copy2(ROOT / "scripts" / name, bundle / name)
         shutil.copy2(WRAPPER, bundle / WRAPPER.name)
         (bundle / "judge.md").write_text("---\nname: bundled\n---\nBUNDLED RULES: start with PASS or FAIL.\n")
         (self.bin / "python3").symlink_to(sys.executable)

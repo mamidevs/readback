@@ -148,7 +148,7 @@ def default_sigint():
 def new_world(base, bytecode=False):
     """Fake providers, the real git behind a symlink, python3, the oracle helper and an environment."""
     base = Path(base)
-    for name in ("bin", "gitbin", "pybin", "tmp", "runs"):
+    for name in ("bin", "gitbin", "pybin", "tmp", "runs", "home"):
         (base / name).mkdir()
     (base / "gitbin" / "git").symlink_to(REAL_GIT)
     (base / "pybin" / "python3").symlink_to(os.path.realpath(sys.executable))
@@ -161,6 +161,7 @@ def new_world(base, bytecode=False):
     (base / "oracle" / "outside_judge.py").write_bytes(sources["helper"])
     (base / "oracle" / "judge.md").write_bytes(sources["rules"])
     env = {
+        "HOME": os.path.realpath(base / "home"),  # no session variable is set: the project mode decides
         "PATH": os.pathsep.join(str(base / name) for name in ("bin", "gitbin", "pybin")),
         "TMPDIR": str(base / "tmp"), "READBACK_TEAMMATES": str(base / "TEAMMATES.md"),
         "READBACK_JUDGE_SECONDS": "30", "PYTHONIOENCODING": "utf-8", "LANG": "C.UTF-8",
@@ -572,7 +573,8 @@ class GuardTests(WorldCase):
 # ---------------------------------------------------------------- BytecodeTests
 
 PLUGIN_FILES = ("scripts/outside-judge.sh", "scripts/outside_judge.py", "scripts/review_capture.py",
-                "scripts/review_receipt.py", "scripts/validate_handoff.py", "agents/judge.md")
+                "scripts/review_receipt.py", "scripts/validate_handoff.py", "scripts/readback_settings.py",
+                "scripts/readback_session.py", "scripts/project_registry.py", "agents/judge.md")
 RECEIPT_RE = r"^receipt    [0-9a-f]{32} \| ends-equal \| validation true \| .+$"
 
 

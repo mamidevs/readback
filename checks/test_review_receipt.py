@@ -39,6 +39,7 @@ sys.path.insert(0, str(SCRIPTS))
 import review_capture  # noqa: E402
 import review_receipt  # noqa: E402
 import validate_handoff  # noqa: E402
+import readback_settings  # noqa: E402
 
 MAGIC = b"readback-manifest-v1\0"
 REAL_GIT = shutil.which("git")
@@ -865,6 +866,7 @@ def new_world(base):
     (base / "gitbin").mkdir()
     (base / "empty").mkdir()
     (base / "tmp").mkdir()
+    (base / "home").mkdir()
     (base / "gitbin" / "git").symlink_to(REAL_GIT)
     for provider in ("claude", "codex"):
         fake = base / "bin" / provider
@@ -875,6 +877,7 @@ def new_world(base):
     (base / "oracle" / "outside_judge.py").write_bytes(sources["helper"])
     (base / "oracle" / "judge.md").write_bytes(sources["rules"])
     env = {
+        "HOME": os.path.realpath(base / "home"),  # no session variable is set: the project mode decides
         "PATH": str(base / "bin") + os.pathsep + str(base / "gitbin"), "TMPDIR": str(base / "tmp"),
         "READBACK_TEAMMATES": str(base / "TEAMMATES.md"), "READBACK_JUDGE_SECONDS": "30",
         "PYTHONDONTWRITEBYTECODE": "1", "PYTHONIOENCODING": "utf-8", "LANG": "C.UTF-8",
@@ -914,7 +917,8 @@ def run_helper(world, helper, host, contract, handoff, repo, extra_env=None, com
     if record.exists():
         record.unlink()
     return types.SimpleNamespace(code=result.returncode, out=result.stdout, err=result.stderr, calls=calls,
-                                 text=result.stdout.decode("utf-8"))
+                                 text=result.stdout.decode("utf-8"), home=env["HOME"],
+                                 seconds=env.get("READBACK_JUDGE_SECONDS"))
 
 
 def comparable(world, calls):
@@ -969,7 +973,7 @@ def reviews_of(common):
 
 def expect_records(test, repo, run, contract_bytes, handoff_bytes, *, route, verdict, answer, exit_status,
                    models, window, before=None, after=None, expected_binding="ends-equal", duplicates=(),
-                   validation=None, completed=True, line=True):
+                   validation=None, completed=True, line=True, model_match="UNVERIFIED"):
     """Check the stored files of a run against values computed here. Return the attempt id."""
     repo = Path(os.path.realpath(repo))
     common = str(repo / ".git")
@@ -998,13 +1002,20 @@ def expect_records(test, repo, run, contract_bytes, handoff_bytes, *, route, ver
     test.assertLessEqual(int(window[0]) - 1, stamp)
     test.assertLessEqual(stamp, window[1] + 1)
     head = git(repo, "rev-parse", "HEAD").strip()
+    project_home = os.path.join(run.home, "logbook", repo.name)  # D3, D9: no settings file, no session id, tier gate
+    host = "claude" if route["provider"] == "codex" else "codex"
+    seconds = float(run.seconds)
+    call = {"host": host, "session_id": None, "tier": "gate", "mode": "gate",
+            "mode_source": {"kind": "project", "settings_source": "defaults"}, "project_home": project_home,
+            "settings_digest": readback_settings.load(project_home)["digest"], "settings_source": "defaults",
+            "deadline_seconds": int(seconds) if seconds == int(seconds) else seconds, "deadline_source": "env"}
     expected_started = {
         "schema_version": 1, "attempt_id": attempt, "review_key": key, "created": created,
         "repository": {"root_name": repo.name, "worktree_root": str(repo), "head": head, "branch": "main"},
         "capture_before": before,
         "contract": {"path": run.contract_path, "sha256": sha(contract_bytes)},
         "handoff": {"path": run.handoff_path, "sha256": sha(handoff_bytes)},
-        "rules_sha256": rules_sha, "route": route, "helper_version": version,
+        "rules_sha256": rules_sha, "route": route, "helper_version": version, "call": call,
     }
     test.assertEqual(started, expected_started)
     markers = os.path.join(common, "readback", "by-manifest")
@@ -1013,12 +1024,13 @@ def expect_records(test, repo, run, contract_bytes, handoff_bytes, *, route, ver
         return attempt
     done = os.path.join(folder, attempt + ".completed.json")
     stored = json.loads(Path(done).read_text())
-    validation = validation or validate_handoff.validate(contract_bytes.decode("utf-8"), handoff_bytes.decode("utf-8"))
+    validation = validation or validate_handoff.validate(  # D8: the text that the judge sees, with universal newlines
+        *(item.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n") for item in (contract_bytes, handoff_bytes)))
     expected_completed = dict(expected_started)
     expected_completed.update({
         "capture_after": after, "binding": expected_binding, "validation": validation,
         "judge": {"verdict": verdict, "provider": route["provider"], "requested_model": route["model"],
-                  "effort": route["effort"], "reported_models": models},
+                  "effort": route["effort"], "reported_models": models, "model_match": model_match},
         "answer_sha256": None if answer is None else sha(answer.encode("utf-8")),
         "exit_status": exit_status, "duplicates_of": sorted(duplicates),
     })
@@ -1215,22 +1227,21 @@ class HelperTests(unittest.TestCase):
                                    models=["claude-fable-5-2"] if provider == "claude" else "unattested")
 
     def test_a_handoff_with_defects_gives_validation_false_n_on_the_line(self):
+        # D8: structural validation `false` stops before the provider. The oracle helper still calls it.
         host, provider = HOSTS[0]
         repo, contract, handoff, c_bytes, h_bytes = self.case(host, handoff="id HND\nstate DONE\n")
-        began = time.time()
         old, new = self.both(host, repo, contract, handoff)
-        ended = time.time()
-        new.contract_path, new.handoff_path = os.path.realpath(contract), os.path.realpath(handoff)
-        compare_with_oracle(self, old, new)
-        attempt = expect_records(self, repo, new, c_bytes, h_bytes, route=route_object(provider), verdict="PASS",
-                                 answer=PASS_ANSWER, exit_status=0, window=(began, ended), models="unattested")
-        _rest, third = split_receipt(new.out)
-        third = third.decode("utf-8")
-        defects = len([f for f in validate_handoff.validate(CONTRACT_TEXT, "id HND\nstate DONE\n")["findings"]
-                       if f["level"] == "defect"])
+        self.assertEqual((old.code, len(old.calls)), (0, 1))
+        self.assertEqual((new.code, new.calls), (3, []))
+        result = validate_handoff.validate(CONTRACT_TEXT, "id HND\nstate DONE\n")
+        defects = len([f for f in result["findings"] if f["level"] == "defect"])
         self.assertGreater(defects, 5)
-        self.assertIn(" | validation false %d | " % defects, third)
-        self.assertIn(attempt, third)
+        lines = new.text.split("\n")
+        self.assertTrue(lines[0].startswith("JUDGE      none | codex:gpt-6-astra | "), lines[0])
+        self.assertTrue(lines[0].endswith(" | no verdict: the handoff fails structural validation (%d defects)" % defects))
+        self.assertEqual(lines[2], "receipt    none | no provider call")
+        self.assertEqual("\n".join(lines[3:]), "\n" + json.dumps(result, sort_keys=True, indent=2) + "\n")
+        self.assertFalse(os.path.exists(os.path.join(os.path.realpath(repo), ".git", "readback")))
 
     def test_route_source_and_reported_models_that_equal_the_request(self):
         row = "judge | codex | claude | claude-fable-5-2 | medium\n"
@@ -1244,7 +1255,7 @@ class HelperTests(unittest.TestCase):
         new.contract_path, new.handoff_path = os.path.realpath(contract), os.path.realpath(handoff)
         route = {"provider": "claude", "model": "claude-fable-5-2", "effort": "medium", "source": "table"}
         expect_records(self, repo, new, c_bytes, h_bytes, route=route, verdict="PASS", answer=PASS_ANSWER,
-                       exit_status=0, window=(began, ended), models=["claude-fable-5-2"])
+                       exit_status=0, window=(began, ended), models=["claude-fable-5-2"], model_match="VERIFIED")
         (self.world.base / "TEAMMATES.md").write_text("judge | codex | claude | fable | low\n")
         repo, contract, handoff, c_bytes, h_bytes = self.case("codex")
         usage = {"FAKE_USAGE": json.dumps({"claude-fable-5-2": {}, "claude-fable-5-1": {}}),
@@ -1471,8 +1482,12 @@ class FaultTests(unittest.TestCase):
                                      h_bytes=h_bytes, common=str(repo / ".git"),
                                      contract_path=os.path.realpath(contract), handoff_path=os.path.realpath(handoff))
 
-    def execute(self, case, spec=None, prepare=None, extra_env=None, interruptible=False):
-        """Prepare, run the oracle, then run the helper under test. Return (run, receipt line, files before)."""
+    def execute(self, case, spec=None, prepare=None, extra_env=None, interruptible=False, reaches_provider=True):
+        """Prepare, run the oracle, then run the helper under test. Return (run, receipt line, files before).
+
+        With reaches_provider false (D8: validation cannot run) the helper makes no provider call and its
+        output is not compared with the oracle's.
+        """
         if prepare:
             prepare(case)
         old = oracle_run(self.world, case.host, case.contract, case.handoff, case.repo, extra_env, interruptible)
@@ -1483,8 +1498,8 @@ class FaultTests(unittest.TestCase):
         else:
             run = driver_run(self.world, case.host, case.contract, case.handoff, case.repo, spec or {}, extra_env)
         self.assertEqual(len(old.calls), 1)
-        self.assertEqual(len(run.calls), 1)
-        third = compare_with_oracle(self, old, run)
+        self.assertEqual(len(run.calls), 1 if reaches_provider else 0)
+        third = compare_with_oracle(self, old, run) if reaches_provider else run.text.split("\n")[2]
         run.contract_path, run.handoff_path = case.contract_path, case.handoff_path
         run.oracle = old
         return run, third, before
@@ -1512,14 +1527,12 @@ class FaultTests(unittest.TestCase):
                 with self.subTest(provider=provider, fault=label):
                     case = self.setup_case(host)
                     began = time.time()
-                    run, third, _before = self.execute(case, spec)
-                    ended = time.time()
-                    self.assertEqual(run.code, 0)
-                    expect_records(self, case.repo, run, case.c_bytes, case.h_bytes, route=route_object(provider),
-                                   verdict="PASS", answer=PASS_ANSWER, exit_status=0, window=(began, ended),
-                                   models=self.models(host), validation={"valid": "unavailable", "reason": reason})
-                    self.assertTrue(third.startswith("receipt    "))
-                    self.assertEqual(third.split(" | ")[1:3], ["ends-equal", "validation unavailable"])
+                    run, third, _before = self.execute(case, spec, reaches_provider=False)
+                    # D8: validation that is `unavailable` blocks the provider call and stores no record
+                    self.assertEqual(run.code, 3)
+                    self.assertTrue(run.text.split("\n")[0].endswith(" | no verdict: the structural validator is not available"))
+                    self.assertEqual(third, "receipt    none | no provider call")
+                    self.assertFalse(os.path.exists(case.common + "/readback"))
                     if label == "raises":
                         self.assertEqual([e for e in run.log if e[0] == "validate"],
                                          [["validate", sha(case.c_bytes), sha(case.h_bytes)]])
@@ -1554,9 +1567,10 @@ class FaultTests(unittest.TestCase):
             for blocked in ("review_receipt", "review_capture"):
                 with self.subTest(provider=provider, blocked=blocked):
                     case = self.setup_case(host)
-                    run, third, before = self.execute(case, {"block": [blocked]})
-                    self.assertEqual(third, "receipt    none | modules not available")
-                    self.assertEqual(run.code, 0)
+                    stops = blocked == "review_receipt"  # D8: without review_receipt validation is unavailable
+                    run, third, before = self.execute(case, {"block": [blocked]}, reaches_provider=not stops)
+                    self.assertEqual(third, "receipt    none | no provider call" if stops else "receipt    none | modules not available")
+                    self.assertEqual(run.code, 3 if stops else 0)
                     self.assertEqual(file_map(case.common), before)
                     self.assertFalse(os.path.exists(case.common + "/readback"))
                     self.assertEqual([e for e in run.log if e[0] == "capture"], [])

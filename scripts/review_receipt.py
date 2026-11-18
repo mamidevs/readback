@@ -112,12 +112,18 @@ def validation_phrase(validation):
     return "validation unavailable"
 
 
-def judge_object(verdict, provider, requested_model, effort, models):
-    """`models` is the collection of reported model names of a validated Claude answer, else None."""
-    return {
+def judge_object(verdict, provider, requested_model, effort, models, model_match=None):
+    """`models` is the collection of reported model names of a validated Claude answer, else None.
+
+    `model_match` is VERIFIED or UNVERIFIED; without it the object has no such key.
+    """
+    judge = {
         "verdict": verdict, "provider": provider, "requested_model": requested_model, "effort": effort,
         "reported_models": "unattested" if models is None else sorted(set(models)),
     }
+    if model_match is not None:
+        judge["model_match"] = model_match
+    return judge
 
 
 def answer_sha256(answer):
@@ -126,13 +132,29 @@ def answer_sha256(answer):
 
 
 def started_record(attempt_id, key, created, repository, capture_before, contract_path, contract_sha256,
-                   handoff_path, handoff_sha256, rules_sha256, route, helper_version):
-    return {
+                   handoff_path, handoff_sha256, rules_sha256, route, helper_version, call=None):
+    """`call` is the object of the settings and the session of the run; a record of part 1 has none."""
+    record = {
         "schema_version": SCHEMA_VERSION, "attempt_id": attempt_id, "review_key": key, "created": created,
         "repository": repository, "capture_before": capture_before,
         "contract": {"path": contract_path, "sha256": contract_sha256},
         "handoff": {"path": handoff_path, "sha256": handoff_sha256},
         "rules_sha256": rules_sha256, "route": route, "helper_version": helper_version,
+    }
+    if call is not None:
+        record["call"] = call
+    return record
+
+
+def no_review_record(attempt_id, created, result, repository, contract_path, contract_sha256, handoff_path,
+                     handoff_sha256, validation, call, helper_version):
+    """The record of a run that made no provider call: `result` is `off` or `skipped`. It binds no content."""
+    return {
+        "schema_version": SCHEMA_VERSION, "attempt_id": attempt_id, "created": created, "result": result,
+        "repository": repository,
+        "contract": {"path": contract_path, "sha256": contract_sha256},
+        "handoff": {"path": handoff_path, "sha256": handoff_sha256},
+        "validation": validation, "call": call, "helper_version": helper_version,
     }
 
 
@@ -252,6 +274,15 @@ def _store(common, key, name, record):
 def store_started(common, record):
     """Store the started record and return its path. An OSError means that nothing new was stored."""
     return _store(common, record["review_key"], record["attempt_id"] + STARTED_SUFFIX, record)
+
+
+def store_no_review(common, record):
+    """Store the record of `off` or `skipped` and return its path. An OSError means that nothing new was stored.
+
+    The file is <common>/readback/no-review/<attempt id>.json. Nothing is written below `reviews` or `by-manifest`.
+    """
+    folder = _make_dirs(common, ("readback", "no-review"))
+    return _publish(folder, record["attempt_id"] + ".json", encode_record(record))
 
 
 def store_completed(common, record):
