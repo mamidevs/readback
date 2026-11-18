@@ -142,7 +142,7 @@ python3 scripts/readback_settings.py --host <host> set <key> <value>
 python3 scripts/readback_settings.py --host <host> migrate-teammates
 ```
 
-The integration selects the judge automatically. No teammates file is required. [TEAMMATES.example.md](TEAMMATES.example.md) describes optional overrides; a Codex lead must retain a Fable judge.
+The integration selects the judge automatically. No teammates file is required. [TEAMMATES.example.md](TEAMMATES.example.md) describes optional overrides of the legacy table; a route from that table must keep a Codex lead's judge in the Fable family. A settings file sets the routes in `judge.routes` instead.
 
 The judge receives the contract, the handoff and the reviewed folder's Git HEAD, status and diff statistics, without file contents. It can read the supplied review files through its CLI. **Judging sends task context to the other model provider.** Local storage does not make model calls local. Choose the review scope with that in mind.
 
