@@ -51,6 +51,21 @@ This package keeps protocol_version 0.7 in project profiles and in the registry;
 
 The tests of the texts of this amendment are in `checks/test_texts_part2.py`. They show that the named sentences and forms stand in the named files.
 
+## Measurements
+
+The lead ran these mutation checks at commit 0323483179f1d08493c5edbca941db8f8b6ba15b with `mutate.py` (sha256 9936de2d08bae1d8314aa17948431cbd3dc4556216725d7b8cdb8a55bdd63383), each on a fresh copy with an empty HOME and TMPDIR. The result files are in `~/logbook/readback/records/settings-design-20261117/part-2-measurements-0323483/`.
+
+- `scripts/readback_settings.py` | commit 0323483 | `settings.json` sha256 8c7ad97a220b64d752de722e713426ca2719be2532eaa46bee9a7199175ed81e | `mutation result: sites 166 | killed 166 (of these by a time limit: 0) | survivors 0 | skipped 0 | baseline exits [0, 0]`
+- `scripts/readback_session.py` | commit 0323483 | `session.json` sha256 a3a7ecc85f0f8ebdc1fa632769645deee94cce6f437df27084f029d92a0f9b1b | `mutation result: sites 140 | killed 140 (of these by a time limit: 0) | survivors 0 | skipped 0 | baseline exits [0, 0]`
+- `scripts/validate_handoff.py` | commit 0323483 | `validator.json` sha256 8227a1cd37093582cab65ef93d7f334fa76f0fc700ce723460a34171e9e26079 | `mutation result: sites 390 | killed 390 (of these by a time limit: 0) | survivors 0 | skipped 0 | baseline exits [0, 0]`
+- `hooks/judge_line.py` | commit 0323483 | `line.json` sha256 92d5caf0e37f600a7a3d970a99c76bf7d57a4b12d87fbf540c2fc4a850be9abb | `mutation result: sites 77 | killed 72 (of these by a time limit: 0) | survivors 5 | skipped 0 | baseline exits [0, 0]`
+- `scripts/judge_rounds.py` | commit 0323483 | `roundsall.json` sha256 d4fb757d1482d23070f8736ce370691870cad3052e9239c4bb6a88ccbf94bdea | `mutation result: sites 261 | killed 257 (of these by a time limit: 0) | survivors 4 | skipped 0 | baseline exits [0, 0]`
+
+The run of `scripts/judge_rounds.py` uses the test classes of `checks/test_judge_modes.py`, `checks/test_judge_rounds.py` and `checks/test_judge_retry.py` through the adapter `part2_helper_all.py` (sha256 90c234b172d3104894b94b81f3902083c8459b6c7b4c91e5d8dce3a79d38696f).
+With `checks/test_judge_rounds.py` alone the same module gives 78 survivors, nearly all in the retry code that `checks/test_judge_retry.py` tests (`rounds.json`).
+The five survivors of `hooks/judge_line.py` (lines 31, 109, 113, 122 and 126) are the equivalent mutants that the lead ruled on in HND-20261118-16.
+The four survivors of `scripts/judge_rounds.py` are equivalent: line 173 only adds calls of `_make_dirs` for folders that exist, line 294 changes a pending attempt in memory that is not published, and both mutants of line 518 end the watchdog without a kill, as the original does for an empty pipe.
+
 ## Limits
 
 - Every protection of this amendment is a safety net: the agent runs as the same user, can write the files, edit the hooks and call a provider directly.

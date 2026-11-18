@@ -9,8 +9,8 @@ Each test reads a file as UTF-8 and asserts an exact sentence or form in the fil
 where the contract CON-20261118-19 names one. The tests show that the named sentences and forms stand in the
 named files. They do not show that the prose around them is right.
 
-No test reads a file outside the repository and no test reads the environment. The section ## Measurements of
-AMENDMENT-11.md and its test class are not part of this file.
+No test reads a file outside the repository and no test reads the environment. MeasurementTests holds the
+result lines of the lead's mutation runs as constants; it does not read the result files.
 
 The run stops at the first failure.
 """
@@ -146,6 +146,26 @@ OLD_AMENDMENTS = (
     ("AMENDMENT-08.md", "c198228bf74b286822cad7a4518d6c97585501535a1fe4bb0862ff03640082db"),
     ("AMENDMENT-09.md", "87e3628080b46fb69ef1a054149a53e9e0614d9771a70f9c16f083070d08b1e5"),
     ("AMENDMENT-10.md", "183811a02cd55ecbc15ae3cb3a413adf8d3a4e38a27f796677a47ac2344eda98"),
+)
+
+
+MEASUREMENT_COMMIT = "0323483179f1d08493c5edbca941db8f8b6ba15b"
+MEASUREMENT_FOLDER = "`~/logbook/readback/records/settings-design-20261117/part-2-measurements-0323483/`"
+MEASUREMENTS = (
+    ("scripts/readback_settings.py", "settings.json", "8c7ad97a220b64d752de722e713426ca2719be2532eaa46bee9a7199175ed81e",
+     "mutation result: sites 166 | killed 166 (of these by a time limit: 0) | survivors 0 | skipped 0 | baseline exits [0, 0]"),
+    ("scripts/readback_session.py", "session.json", "a3a7ecc85f0f8ebdc1fa632769645deee94cce6f437df27084f029d92a0f9b1b",
+     "mutation result: sites 140 | killed 140 (of these by a time limit: 0) | survivors 0 | skipped 0 | baseline exits [0, 0]"),
+    ("scripts/validate_handoff.py", "validator.json", "8227a1cd37093582cab65ef93d7f334fa76f0fc700ce723460a34171e9e26079",
+     "mutation result: sites 390 | killed 390 (of these by a time limit: 0) | survivors 0 | skipped 0 | baseline exits [0, 0]"),
+    ("hooks/judge_line.py", "line.json", "92d5caf0e37f600a7a3d970a99c76bf7d57a4b12d87fbf540c2fc4a850be9abb",
+     "mutation result: sites 77 | killed 72 (of these by a time limit: 0) | survivors 5 | skipped 0 | baseline exits [0, 0]"),
+    ("scripts/judge_rounds.py", "roundsall.json", "d4fb757d1482d23070f8736ce370691870cad3052e9239c4bb6a88ccbf94bdea",
+     "mutation result: sites 261 | killed 257 (of these by a time limit: 0) | survivors 4 | skipped 0 | baseline exits [0, 0]"),
+)
+MEASUREMENT_SURVIVORS = (
+    "The five survivors of `hooks/judge_line.py` (lines 31, 109, 113, 122 and 126) are the equivalent mutants that the lead ruled on in HND-20261118-16.",
+    "The four survivors of `scripts/judge_rounds.py` are equivalent:",
 )
 
 
@@ -394,6 +414,40 @@ class ReadmeTests(TextCase):
         text = section(read("INSTALL.md"), "## Remove")
         for folder in INSTALL_FOLDERS:
             self.assertIn("`" + folder + "`", text)
+
+
+class MeasurementTests(TextCase):
+    """The section ## Measurements of AMENDMENT-11.md: one line for each measured module, as D5 of CON-20261118-19 names it."""
+
+    def setUp(self):
+        self.text = section(read("AMENDMENT-11.md"), "## Measurements")
+
+    def test_section_stands_before_the_limits(self):
+        text = read("AMENDMENT-11.md")
+        self.assertLess(text.index("\n## Measurements\n"), text.index("\n## Limits\n"))
+
+    def test_commit_and_folder(self):
+        self.assert_once(self.text, MEASUREMENT_COMMIT, "## Measurements")
+        self.assert_once(self.text, MEASUREMENT_FOLDER, "## Measurements")
+
+    def test_one_line_for_each_module(self):
+        items = [line for line in self.text.split("\n") if line.startswith("- ")]
+        expected = ["- `%s` | commit %s | `%s` sha256 %s | `%s`" % (module, MEASUREMENT_COMMIT[:7], name, digest, result)
+                    for module, name, digest, result in MEASUREMENTS]
+        self.assertEqual(items, expected)
+
+    def test_result_lines_have_the_form_of_mutate(self):
+        form = re.compile(r"mutation result: sites (\d+) \| killed (\d+) \(of these by a time limit: 0\) \| survivors (\d+) "
+                          r"\| skipped 0 \| baseline exits \[0(, 0)?\]$")
+        for module, _name, digest, result in MEASUREMENTS:
+            match = form.match(result)
+            self.assertIsNotNone(match, module)
+            sites, killed, survivors = (int(match.group(n)) for n in (1, 2, 3))
+            self.assertEqual(killed + survivors, sites, module)
+            self.assertRegex(digest, r"^[0-9a-f]{64}$")
+
+    def test_survivors_are_ruled_on(self):
+        self.assert_sentences(self.text, MEASUREMENT_SURVIVORS, "## Measurements")
 
 
 class SyncTests(TextCase):
