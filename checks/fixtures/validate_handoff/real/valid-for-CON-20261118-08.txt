@@ -1,0 +1,17 @@
+id        HND-20261118-98
+from      worker
+date      2026-11-18
+state     DONE
+readback  task: a fixture handoff for CON-20261118-08 | limits: none | done when: ACC-1, ACC-2, ACC-3, ACC-4, ACC-5
+summary   A fixture: every ACC has a status and a checks line that equals its Check text.
+changes   none
+commit    none
+checks    python3 -B -c "import sys, unittest; r = unittest.TextTestRunner().run(unittest.defaultTestLoader.discover('checks', pattern='test_*.py')); sys.exit(0 if r.wasSuccessful() and not r.skipped and r.testsRun else 1)" | exit 0 | ok
+          python3 scripts/sync.py --check | exit 0 | ok
+          python3 -B checks/test_validate_handoff.py GrammarTests StructureTests EvidenceTests FixtureTests CLITests && python3 -B checks/test_review_capture.py FormatTests IdentityTests StateTests RepoStateTests NoWriteTests CLITests RepoCLITests && python3 -B checks/test_review_receipt.py PureTests StoreTests HelperTests FaultTests SyncAndSnapshotTests && python3 -B checks/test_commit_observation.py FormTests StoreTests HookTests FaultTests SyncTests && python3 -B checks/test_judge_hardening.py SignalTests GuardTests BytecodeTests BaselineTests && python3 -B checks/test_texts_part1.py AmendmentTests ReceiptTests ReadmeTests SyncTests   Observation: review T1 to T5 below against the final diff, the original records and the kept outputs; record evidence and a status for each. | exit 0 | ok
+          git diff --quiet bf35af5 e49f439fc310df5cc8f0eb8f56e3d40b7b586aee -- scripts/publish_records.py scripts/project_registry.py scripts/project_index.py scripts/resolve_claude_project.py scripts/resolve_codex_project.py agents evals schemas docs hooks/hooks.json portable/codex .claude-plugin EXAMPLE.md TEAMMATES.example.md LICENSE AMENDMENT-01.md AMENDMENT-02.md AMENDMENT-03.md AMENDMENT-04.md AMENDMENT-05.md AMENDMENT-06.md AMENDMENT-07.md AMENDMENT-08.md AMENDMENT-09.md | exit 0 | ok
+          for c in 340ce82 bc63aae 8bff881 2929b89 8f4a926 4bc628e 26660fc f56cb63 e49f439; do git merge-base --is-ancestor $c e49f439fc310df5cc8f0eb8f56e3d40b7b586aee || exit 1; done   Observation: the records, the diff of each commit, and the complete inventory of `git log --oneline bf35af5..e49f439fc310df5cc8f0eb8f56e3d40b7b586aee` and `git diff --stat bf35af5 e49f439fc310df5cc8f0eb8f56e3d40b7b586aee`. | exit 0 | ok
+contract  ACC-1 VERIFIED | ACC-2 VERIFIED | ACC-3 VERIFIED | ACC-4 VERIFIED | ACC-5 VERIFIED
+open      -
+issues    -
+next      Accept.

@@ -14,10 +14,41 @@ Text form
   A key stands at column 0. After it come spaces or tabs and the value. A line
   that starts with a space or a tab continues the value of the key above it.
   Blank lines are ignored. A key is a word of letters, digits, `_` and `-`, or
-  the words `Out of scope:`. Any other line at column 0, and a continuation line
-  before the first key, is reported as `unresolved`.
+  the words `Out of scope:` (see the colon keys of a handoff below). Any other
+  line at column 0, and a continuation line before the first key, is reported
+  as `unresolved`.
   Contract: `CON-<YYYYMMDD>-<NN>  <task>`, then `ACC-<n>  <statement>  Check:
   <check>` lines (a continuation line is kept as a separate physical line), then `Out of scope:`.
+  Sections of a contract (version 2). After the line `Out of scope:`, with a
+  value or without one, a contract may hold sections. A section starts with a
+  line at column 0 that begins with `Limits`, `Definitions`, `Evidence
+  requirements`, `Coverage list` or `Command lines`, followed by the end of the
+  line, a space or tab, a comma or a colon; a section start is matched before an
+  ordinary key. Every physical line after a section start, blank lines and
+  indented lines included, belongs to that section until the next section
+  start. The section starts with its own line. The sections are kept in
+  `extra["sections"]` as a list of `{"name", "lines"}`. Inside a section a line
+  at column 0 that begins with `ACC-` or `CON-` and a digit is a V1 defect (`a
+  contract line stands inside a section`); any other line of a section that
+  begins with `ACC-` or `CON-`, after optional spaces or tabs, is a V1
+  `unresolved` finding. No other line of a section is checked. Before the first
+  section, and in a contract without sections, the rules of version 1 stand.
+  Colon keys of a handoff (version 2). A key of PROTOCOL.md 3.3 at column 0 may
+  be followed directly by one colon (`summary: text`). Exactly that colon is
+  consumed, and the value keeps the rest of the line with only ASCII spaces and
+  tabs removed at both ends, so `summary: task: x` and `summary task: x` both
+  hold `task: x`. A colon after any other word is no delimiter. Both forms may
+  be mixed in one handoff, and a key that stands twice in either form is
+  repeated. A line at column 0 that is no key is not supported: it is kept in
+  the value of the key above it and is reported as `unresolved`. In a handoff
+  that holds a colon key only the keys of 3.3 are keys, so a line such as
+  `profile  x` is such a line too. A kept line never changes how `state` is
+  read, and below `checks` it is read as evidence by its own text but is never
+  taken for the command of a Check. The
+  status bullets `- ACC-<n> <STATUS>` below `contract` are read for V3 and V5,
+  and the layout finding stays; a status that is missing because such a line
+  could not be read is `unresolved`, and an established defect still gives
+  `false`.
   Handoff: one key per line with the keys of PROTOCOL.md 3.3. The value of
   `checks` is one evidence line per physical line. The value of `contract` is
   `ACC-<n> <STATUS>` parts joined with ` | `; a status may be followed by a
@@ -50,7 +81,8 @@ JSON form
   `statement` and `check`.
 
 Extra keys are kept in the `extra` field of the parsed result and are never a
-defect, in both forms.
+defect, in both forms; a handoff that holds a colon key has no extra key (see
+the colon keys above).
 
 Rules V1 to V6 are in the functions `check_contract`, `check_handoff` and
 `check_evidence`. A finding has `rule`, `acc`, `level` and `message`. Level
@@ -63,7 +95,7 @@ import json
 import re
 import sys
 
-VALIDATOR_VERSION = "1.1.0"
+VALIDATOR_VERSION = "2.0.0"
 
 REQUIRED_KEYS = (
     "id", "from", "date", "state", "readback", "summary", "changes",
@@ -73,6 +105,13 @@ STATES = ("DONE", "PARTIAL", "BLOCKED", "UNABLE")
 STATUSES = ("VERIFIED", "FAILED", "UNVERIFIED")
 
 _KEY_RE = re.compile(r"^(Out of scope:|[A-Za-z][A-Za-z0-9_-]*)(?=[ \t\r]|$)")
+_KEY3 = "(" + "|".join(REQUIRED_KEYS) + ")"
+_COLON_KEY_RE = re.compile("^" + _KEY3 + ":")
+_PLAIN_KEY3_RE = re.compile("^" + _KEY3 + r"(?=[ \t\r]|$)")
+_SECTION_RE = re.compile(
+    r"^(Limits|Definitions|Evidence requirements|Coverage list|Command lines)(?=[ \t,:]|$)")
+_SECTION_DEFECT_RE = re.compile(r"^(?:ACC|CON)-[0-9]")
+_SECTION_LINE_RE = re.compile(r"^[ \t]*(?:ACC|CON)-")
 _CON_ID_RE = re.compile(r"^CON-\d{8}-\d{2}$")
 _ACC_ID_RE = re.compile(r"^ACC-\d+$")
 _CHECK_RE = re.compile(r"(?:^|\s)Check:[ \t]*(.*)\Z", re.S)
@@ -91,20 +130,40 @@ class _Pairs(list):
     """A JSON object read as a list of (key, value) pairs, so repeats survive."""
 
 
+class _Kept(str):
+    """A line at column 0 that is no key, kept below the key above it. It is part of
+    the value of that key, but a rule that reads `state` does not take it for the state."""
+
+
 def _finding(rule, acc, level, message):
     return {"rule": rule, "acc": acc, "level": level, "message": message}
 
 
 # ---------------------------------------------------------------- parsing
 
-def _split_text(text):
-    """Return ([(key, [lines])], [problem]) for the text form.
+def _split_text(text, colon_keys=False, sections=False):
+    """Return ([(key, [lines])], [problem], [section]) for the text form.
 
     Lines are split at "\n" only. A stored line has only ASCII spaces and tabs
-    removed at both ends.
+    removed at both ends. With `colon_keys` (a handoff) a PROTOCOL.md 3.3 key may
+    be followed directly by one colon, and a line at column 0 that is no key is
+    kept below the key above it. With `sections` (a contract) a section start
+    after `Out of scope:` opens a section that holds every later physical line.
     """
-    pairs, problems = [], []
-    for raw in text.split("\n"):
+    pairs, problems, found = [], [], []
+    lines = text.split("\n")
+    if lines[-1] == "":
+        lines.pop()
+    after_scope = False
+    colon_form = colon_keys and any(_COLON_KEY_RE.match(raw) for raw in lines)
+    for raw in lines:
+        start = _SECTION_RE.match(raw) if sections and after_scope else None
+        if start:
+            found.append({"name": start.group(1), "lines": [raw]})
+            continue
+        if found:
+            found[-1]["lines"].append(raw)
+            continue
         if not raw.strip():
             continue
         if raw[0] in " \t":
@@ -113,13 +172,19 @@ def _split_text(text):
             else:
                 pairs[-1][1].append(raw.strip(" \t"))
             continue
-        m = _KEY_RE.match(raw)
+        if colon_form:
+            m = _COLON_KEY_RE.match(raw) or _PLAIN_KEY3_RE.match(raw)
+        else:
+            m = _KEY_RE.match(raw)
         if not m:
             problems.append("line at column 0 is not a key: %r" % raw[:60])
+            if colon_keys and pairs:
+                pairs[-1][1].append(_Kept(raw.strip(" \t")))
             continue
+        after_scope = after_scope or m.group(1) == "Out of scope:"
         rest = raw[m.end():].strip(" \t")
         pairs.append((m.group(1), [rest] if rest else []))
-    return pairs, problems
+    return pairs, problems, found
 
 
 def _load_json(text):
@@ -153,8 +218,8 @@ def parse_handoff(text):
     Returns a dict: form, ok, pairs (all keys in order), values (first value of
     each key), extra (keys outside PROTOCOL.md 3.3) and problems.
     """
-    result = {"form": "text", "ok": True, "pairs": [], "values": {}, "extra": {}, "problems": [],
-              "checks_lines": []}
+    result = {"form": "text", "ok": True, "pairs": [], "values": {}, "own_values": {}, "extra": {},
+              "problems": [], "checks_lines": []}
     if _looks_json(text):
         result["form"] = "json"
         obj, err = _load_json(text)
@@ -169,26 +234,28 @@ def parse_handoff(text):
                 for item in items:
                     t = _value_text(item)
                     if t.strip(" \t"):
-                        result["checks_lines"].append({"text": t.strip(" \t"), "multiline": "\n" in t})
+                        result["checks_lines"].append({"text": t.strip(" \t"), "multiline": "\n" in t, "kept": False})
                 break
     else:
-        raw, problems = _split_text(text)
+        raw, problems, _ = _split_text(text, colon_keys=True)
         result["problems"].extend(problems)
         pairs = [(k, "\n".join(lines)) for k, lines in raw]
+        for k, lines in raw:
+            if k == "checks" and k not in result["own_values"]:
+                # a kept line is read by its own text as evidence, but it is never the command of a Check
+                result["checks_lines"] = [{"text": l, "multiline": False, "kept": isinstance(l, _Kept)}
+                                          for l in lines if l.strip(" \t")]
+            result["own_values"].setdefault(k, "\n".join(l for l in lines if not isinstance(l, _Kept)))
         if not pairs:
             result["ok"] = False
             result["problems"].append("no key found in the handoff")
     result["pairs"] = pairs
-    if result["form"] == "text":
-        for k, v in pairs:
-            if k == "checks":
-                result["checks_lines"] = [{"text": l, "multiline": False}
-                                          for l in v.split("\n") if l.strip(" \t")]
-                break
     for key, value in pairs:
         result["values"].setdefault(key, value)
         if key not in REQUIRED_KEYS:
             result["extra"].setdefault(key, value)
+    if result["form"] == "json":
+        result["own_values"] = dict(result["values"])
     return result
 
 
@@ -258,8 +325,10 @@ def parse_contract(text):
             else:
                 result["extra"].setdefault(key, _value_text(value))
     else:
-        raw, problems = _split_text(text)
+        raw, problems, found = _split_text(text, sections=True)
         result["problems"].extend(problems)
+        if found:
+            result["extra"]["sections"] = found
         if not raw:
             result["ok"] = False
             result["problems"].append("no key found in the contract")
@@ -312,6 +381,15 @@ def check_contract(contract):
         seen.add(acc)
         if not st["check"]:
             out.append(_finding("V1", acc, "defect", "%s has no Check:" % acc))
+    sections = contract["extra"].get("sections")
+    for section in sections if isinstance(sections, list) else ():
+        for line in section["lines"]:
+            if _SECTION_DEFECT_RE.match(line):
+                out.append(_finding("V1", None, "defect", "a contract line stands inside a section"))
+            elif _SECTION_LINE_RE.match(line):
+                out.append(_finding("V1", None, "unresolved",
+                                    "a line of the section %s begins with ACC- or CON-: %r" % (
+                                        section["name"], line.strip(" \t")[:60])))
     return out
 
 
@@ -331,8 +409,8 @@ def check_handoff(handoff):
             first.append(key)
     if first != sorted(first, key=REQUIRED_KEYS.index):
         out.append(_finding("V2", None, "defect", "the handoff keys are not in the order of PROTOCOL.md 3.3"))
-    if "state" in handoff["values"]:
-        state = handoff["values"]["state"].strip()
+    if "state" in handoff["own_values"]:
+        state = handoff["own_values"]["state"].strip()
         if state not in STATES:
             out.append(_finding("V2", None, "defect",
                                 "state %r is not DONE, PARTIAL, BLOCKED or UNABLE" % state[:40]))
@@ -393,7 +471,7 @@ def check_statuses(contract, handoff):
         if acc not in counts:
             out.append(_finding("V3", acc, missing_level, "%s has no status" % acc))
     # V5
-    if handoff["values"].get("state", "").strip() == "DONE":
+    if handoff["own_values"].get("state", "").strip() == "DONE":
         for acc in contract_ids:
             sts = [s for a, s, _ in entries if a == acc]
             if not sts:
@@ -480,12 +558,19 @@ def parse_evidence_line(line, multiline=False):
     return _line_info(None, False, None, False, "the command of the line cannot be told")
 
 
+def _read_checks_line(entry):
+    """Read one entry of `checks_lines`. A kept line gives the evidence its own text gives,
+    but it can never be matched with the Check text of an ACC."""
+    info = parse_evidence_line(entry["text"], entry["multiline"])
+    return dict(info, matchable=info["matchable"] and not entry["kept"])
+
+
 def check_evidence(contract, handoff, entries):
     """V4 and V6."""
     out = []
     if "checks" not in handoff["values"]:
         return out
-    lines = [parse_evidence_line(l["text"], l["multiline"]) for l in handoff["checks_lines"]]
+    lines = [_read_checks_line(l) for l in handoff["checks_lines"]]
     any_evidence = any(l["complete"] or l["ambiguous"] or l["doubtful"] for l in lines)
     checks = {}
     for st in contract["statements"]:

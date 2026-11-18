@@ -1,0 +1,17 @@
+id        HND-20261118-91
+from      worker
+date      2026-11-18
+state     DONE
+readback  task: a fixture handoff for CON-20261118-01 | limits: none | done when: ACC-1, ACC-2, ACC-3, ACC-4, ACC-5
+summary   A fixture: every ACC has a status and a checks line that equals its Check text.
+changes   none
+commit    none
+checks    python3 -B checks/test_commit_observation.py FormTests | exit 0 | ok
+          python3 -B checks/test_commit_observation.py StoreTests | exit 0 | ok
+          python3 -B checks/test_commit_observation.py HookTests | exit 0 | ok
+          python3 -B checks/test_commit_observation.py FaultTests | exit 0 | ok
+          python3 -B checks/test_commit_observation.py SyncTests && python3 scripts/sync.py --check && git diff --quiet 2929b899585092be2da505cd739d272336d919bb -- checks/test_guard_git.py checks/test_outside_judge.py checks/test_project_index.py checks/test_project_registry.py checks/test_publish_records.py checks/test_review_capture.py checks/test_review_receipt.py checks/test_validate_handoff.py && python3 -m unittest discover -s checks -p 'test_*.py' | exit 0 | ok
+contract  ACC-1 VERIFIED | ACC-2 VERIFIED | ACC-3 VERIFIED | ACC-4 VERIFIED | ACC-5 VERIFIED
+open      -
+issues    -
+next      Accept.
