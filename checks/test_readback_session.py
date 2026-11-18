@@ -1410,7 +1410,9 @@ class ConcurrencyTests(WithTemp):
         self.assertEqual(results["set_mode"], {"result": None})
         self.assertEqual(results["authorize"], {"result": None})
         self.assertEqual(results["clear"], {"result": None})
-        self.assertIn(results["consume"]["result"], (None, authorization("e1")))
+        # the order of the four is free: consume before clear takes e1; after clear it finds nothing, or e9 when
+        # authorize ran between clear and consume
+        self.assertIn(results["consume"]["result"], (None, authorization("e1"), authorization("e9", AT2)))
         # the four ran one after another, never together: the end state is one of the clear outcomes
         self.assertIn(self.read()[0], ("absent", "valid"))
 
