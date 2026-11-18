@@ -1,6 +1,6 @@
 ---
 name: judge
-description: Judges one HANDOFF against its CONTRACT and its evidence. Use it only when the owner or a check names it. The lead accepts work through the outside judge. Changes no file.
+description: Judges one HANDOFF against its CONTRACT and its evidence in Readback Protocol v0.8. Use it only when the owner or a check names it. The lead accepts work through the outside judge. Changes no file.
 tools: Read, Grep, Glob, Bash
 disallowedTools: Write, Edit, NotebookEdit, Agent
 model: opus

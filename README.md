@@ -6,7 +6,7 @@ A finished change tells you what exists now. It does not tell you why you chose 
 
 Start with one repository. When a project spans an API, backend, and frontend, optional project settings let those repositories use one logbook while every agent keeps working in its own code directory.
 
-**Version:** **v0.9.0** adds Amendment 09: when the contract names a check, VERIFIED rests on that check. It also runs the Git guard hook in Codex and adds a worker eval case for a check that tests less than its statement. v0.8.0 added Amendment 08: evidence rules for the judge, the reviewed folder's Git state in the judge prompt, and the Git guard hook for Claude Code. v0.7.0 added shared-project routing, serialized Markdown publication, and document indexing. The core communication rules are **Readback Protocol v0.7**. The [shared-project extension](docs/protocol-0.7-draft.md) documents the shipped behavior and identifies the extended handoff envelope that remains a draft. Existing installations require an explicit update.
+**Version:** **v0.9.0** adds Amendment 09: when the contract names a check, VERIFIED rests on that check. It also runs the Git guard hook in Codex and adds a worker eval case for a check that tests less than its statement. v0.8.0 added Amendment 08: evidence rules for the judge, the reviewed folder's Git state in the judge prompt, and the Git guard hook for Claude Code. v0.7.0 added shared-project routing, serialized Markdown publication, and document indexing. The core communication rules are **Readback Protocol v0.8**, which includes Amendment 11. No package ships Amendment 11 yet. The [shared-project extension](docs/protocol-0.7-draft.md) documents the shipped behavior and identifies the extended handoff envelope that remains a draft. Existing installations require an explicit update.
 
 ## What it does
 
@@ -29,7 +29,7 @@ readback organizes a personal agent workflow. It does not provide a hosted team 
   <img alt="A task passes between the owner, lead, worker, independent judge, and logbook." src="docs/flow-light.svg">
 </picture>
 
-The lead records approvals when needed, defines the task, and delegates it. The worker returns its readback and evidence. The judge checks the handoff against the contract. The lead accepts work only when the worker reports DONE and the judge returns PASS, then records the result and next step.
+The lead records approvals when needed, defines the task, and delegates it. The worker returns its readback and evidence. The judge checks the handoff against the contract. The lead accepts work only when the worker reports DONE and every contract statement is VERIFIED. Depending on the judge mode, an outside judge must also return PASS. The lead then records the result and next step.
 
 The default readback arrives with the handoff. For a risky start, request a confirmed readback before the worker begins. A PASS supports the handoff's claims; an honest PARTIAL handoff can pass without completing the task.
 
@@ -132,6 +132,16 @@ Run this setup once. The clone uses `main`; check out the `v0.9.0` tag before co
 | Codex | Claude Code | `fable` | high |
 | Claude Code | Codex | `gpt-6-astra` | high |
 
+The judge runs in one of three modes: off, gate and each. The default mode is gate: a step gets no outside judge, and a part gets one. The mode each also sends each step to the outside judge. The owner sets the mode with a judge line; [AMENDMENT-11.md](AMENDMENT-11.md) holds the forms.
+
+The settings file is <project home>/settings.json. The script `scripts/readback_settings.py` reads and writes it:
+
+```sh
+python3 scripts/readback_settings.py --host <host> show
+python3 scripts/readback_settings.py --host <host> set <key> <value>
+python3 scripts/readback_settings.py --host <host> migrate-teammates
+```
+
 The integration selects the judge automatically. No teammates file is required. [TEAMMATES.example.md](TEAMMATES.example.md) describes optional overrides; a Codex lead must retain a Fable judge.
 
 The judge receives the contract, the handoff and the reviewed folder's Git HEAD, status and diff statistics, without file contents. It can read the supplied review files through its CLI. **Judging sends task context to the other model provider.** Local storage does not make model calls local. Choose the review scope with that in mind.
@@ -173,7 +183,12 @@ This is a personal workflow with cooperating local sessions. It has no multi-use
 | [output-styles/](output-styles/), [agents/](agents/), [skills/](skills/) | Claude Code instructions |
 | [hooks/](hooks/), [portable/codex/](portable/codex/) | Hook that denies Git commands which discard work, and its Codex definition |
 | [portable/skills/](portable/skills/), [scripts/sync.py](scripts/sync.py) | Generated portable instructions and bundled helpers |
-| [scripts/project_registry.py](scripts/project_registry.py) | Project identity, validation, and routing |
+| [scripts/project_registry.py](scripts/project_registry.py) | Project identity, validation, routing, and the legacy home of a linked worktree |
+| [scripts/readback_settings.py](scripts/readback_settings.py) | Settings file of a project home: show, set and migrate-teammates |
+| [scripts/readback_session.py](scripts/readback_session.py) | Session state: the mode override and the round authorizations |
+| [scripts/judge_rounds.py](scripts/judge_rounds.py) | Round accounting of the outside judge |
+| [hooks/judge_line.py](hooks/judge_line.py) | Hook that reads the owner's judge line |
+| [hooks/guard_git.py](hooks/guard_git.py) | Git guard hook and its commit observation switch |
 | [scripts/publish_records.py](scripts/publish_records.py) | Serialized Markdown publication and recovery |
 | [scripts/project_index.py](scripts/project_index.py) | Document catalog, query, and freshness checks |
 | [scripts/outside_judge.py](scripts/outside_judge.py) | Provider selection, restrictions, deadlines, and the receipt line |

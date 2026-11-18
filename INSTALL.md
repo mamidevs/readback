@@ -70,6 +70,11 @@ bash checks/outside-judge.sh claude
 
 The last two commands use your provider accounts and consume model calls.
 
+### Judge line for Claude Code
+
+The plugin ships the hook `hooks/judge_line.py` for the events `UserPromptSubmit`, `SessionStart` and `SessionEnd`. The plugin's `hooks/hooks.json` names it for each event. You add nothing.
+The hook reads the judge line that the owner writes as the first line of a prompt. [AMENDMENT-11.md](AMENDMENT-11.md) holds the forms.
+
 ## Try it without an install
 
 ```
@@ -103,6 +108,8 @@ Run this from the intended repository; it deletes review records and observation
 rm -r "$(git rev-parse --git-common-dir)/readback"
 ```
 
+The judge line and the round accounting keep local files in `~/logbook/.readback/sessions/` and `~/logbook/.readback/rounds/`. Delete both folders if you want to.
+
 ## OpenAI Codex
 
 Codex has no output style and no plugin from this repository. It reads Agent Skills and `AGENTS.md`.
@@ -122,7 +129,7 @@ Codex can ask before it writes outside the project. Approve the access to the lo
 Check: ask Codex for a small change. The answer ends in a brief of four fields, and `~/logbook/<project>/` holds `LOG.md` and `CURRENT.md`.
 
 Update: pull the repository and copy the four folders again.
-Remove: first remove the readback entry from `~/.codex/hooks.json` (see the Git guard below). Then delete the four folders from `~/.agents/skills/` and the line from `~/.codex/AGENTS.md`.
+Remove: first remove the readback entry from `~/.codex/hooks.json` (see the Git guard below). Then delete the four folders from `~/.agents/skills/` and the line from `~/.codex/AGENTS.md`. The judge-line entries are readback entries too; the folders `~/logbook/.readback/sessions/` and `~/logbook/.readback/rounds/` are described under Remove above.
 
 ### Git guard for Codex
 
@@ -153,6 +160,12 @@ Limits on Codex:
   A checkout of one file name can then pass when the session folder is outside the repository.
 - Input sent to a shell that already runs is not checked again.
 - A hook that times out lets the command run.
+
+### Judge line for Codex
+
+The lead folder holds `scripts/judge_line.py`. `portable/codex/hooks.json` names it for the events `UserPromptSubmit`, `SessionStart` and `SessionEnd`.
+Merge the judge-line entries into $CODEX_HOME/hooks.json (default ~/.codex/hooks.json), trust them with /hooks, register each entry once and check one live prompt; without these steps a judge line changes nothing under Codex.
+These steps describe documented Codex hook behaviour. It is not measured here.
 
 ## Other CLIs
 

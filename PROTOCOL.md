@@ -1,8 +1,10 @@
-# Readback Protocol v0.7
+# Readback Protocol v0.8
 
-Status: approved. DEC-20261115-01, the owner said "go" on 2026-11-15.
-This text includes Amendment 01 (DEC-20261115-04), Amendment 02 (DEC-20261115-07), Amendment 03 (DEC-20261115-12), Amendment 04 (DEC-20261115-15), Amendment 05 (DEC-20261116-01), Amendment 06 (DEC-20261116-04, DEC-20261116-05), Amendment 07 (DEC-20261116-07) and Amendment 08 (DEC-20261117-06, DEC-20261117-08, DEC-20261117-09).
-Amendment 03 changed the meaning of two fixed words. Amendment 04 changed the DEC line. Amendment 05 added teammates at other providers. Amendment 06 added the rule about the memory of the host. Amendment 07 made opposite-provider judging automatic. Amendment 08 widened UNVERIFIED and added judge evidence rules. Each change gave the text a new number.
+Status: approved. This text is Readback Protocol v0.8. DEC-20261115-01, the owner said "go" on 2026-11-15.
+This text includes Amendment 01 (DEC-20261115-04), Amendment 02 (DEC-20261115-07), Amendment 03 (DEC-20261115-12), Amendment 04 (DEC-20261115-15), Amendment 05 (DEC-20261116-01), Amendment 06 (DEC-20261116-04, DEC-20261116-05), Amendment 07 (DEC-20261116-07), Amendment 08 (DEC-20261117-06, DEC-20261117-08, DEC-20261117-09) and Amendment 11 (DEC-20261117-23, DEC-20261117-28, DEC-20261118-01).
+Amendment 03 changed the meaning of two fixed words. Amendment 04 changed the DEC line. Amendment 05 added teammates at other providers. Amendment 06 added the rule about the memory of the host. Amendment 07 made opposite-provider judging automatic. Amendment 08 widened UNVERIFIED and added judge evidence rules. Amendment 11 added the judge modes and replaced the rule that every accepted handoff needs a judge's PASS. Each change gave the text a new number.
+
+This package keeps protocol_version 0.7 in project profiles and in the registry; part 4 of the redesign owns the compatibility in scripts/project_registry.py, the profile, project and registry schemas, and the tests that keep 0.7 projects readable without a silent rewrite.
 
 One format for what the lead says and what it records.
 The owner reads less. A message that leaves items out says how many and where they are.
@@ -202,6 +204,17 @@ No teammates table is required. The lead names its host when it calls the helper
 An unavailable provider gives `JUDGE none`. Do not substitute a local judge or another model.
 The judge does not delegate or start another judge.
 
+The judge runs in one of three modes. The mode decides which handoff gets an outside judge.
+
+| Mode | Step handoff | Gate handoff |
+|---|---|---|
+| off | no judge; JUDGE off | no judge; JUDGE off |
+| gate | no judge; JUDGE skipped | outside judge |
+| each | outside judge; a step PASS accepts nothing | outside judge |
+
+The default mode is gate.
+The owner sets the mode with a judge line. Amendment 11 holds the forms.
+
 The judge checks five things:
 
 1. The evidence supports each claim.
@@ -219,7 +232,18 @@ After the first word, name each claim that has no evidence and each failure that
 PASS is about the handoff. It does not say that the task is complete.
 A handoff that reports FAILED or UNVERIFIED with evidence can get PASS.
 
-The lead accepts the work when the state is DONE and the judge says PASS.
+The lead accepts work by these rules.
+
+Accept only a DONE handoff whose contract statements are all VERIFIED.
+In mode off, acceptance rests on the contract's named checks and the lead's reading.
+In mode gate, the acceptance of a step also needs a claim check.
+A claim check breaks the claimed behaviour on a copy and shows that the named check fails.
+In mode each, the outside judge screens each step; a step PASS accepts nothing, and a step FAIL sends the work back.
+An acceptance without a judge needs structural validation true.
+In the modes gate and each, the acceptance of a part needs a gate PASS.
+The owner's approval of an action stays separate.
+JUDGE off and JUDGE skipped are not PASS.
+
 After a FAIL, the lead sends the work back or tells the owner what failed.
 If the state is not DONE, the lead tells the owner what remains.
 Before the lead accepts, it reads the owner's request again. If the contract missed a part of the request, the lead tells the owner.
@@ -231,6 +255,7 @@ JUDGE     <PASS, FAIL or none> | <the judge> | <repo@sha or none> | <what the ju
 ACCEPTED  <yes or no> | <date> | <the reason, when no>
 ```
 
+Copy the helper's complete JUDGE line; ACCEPTED records what the acceptance rests on.
 For an outside judge, store the complete helper output before ACCEPTED, including the execution line, the receipt line and the full answer.
 The output records the provider, requested model, reported model when available, requested effort and execution method.
 Claude Fable receives only Read, Grep and Glob tools. It cannot rerun shell checks.
@@ -254,6 +279,11 @@ In the first form, `false n` gives the number of defects that the structural val
 A receipt changes no verdict.
 The review records and the observation file are local and untrusted: the agent runs as the same user and can write them.
 ends-equal means that both captures succeeded with the same manifest identity; it does not establish unchanged content between captures.
+
+The lead passes --coverage for a gate call and lists the worker contracts and the original handoffs.
+The helper allows a gate call without a list and checks neither the completeness of the list nor the judge's access to the files.
+At the limit of the rounds another reservation needs a matching authorization of the owner.
+A changed digest of the effective settings needs a matching authorization; one authorization covers both exceptions of one reservation.
 
 ## 5. Trace
 
@@ -320,4 +350,4 @@ Write the requested values. Write the model that the host reports only when it d
 
 ## Optional project binding extension (package v0.7.0)
 
-A project may explicitly bind several repositories to one local record home. The resolved home overrides the repository-name default. An unbound repository retains the default; a marked but invalid binding stops writes. Shared records retain repository and check-context provenance. Only the lead publishes records through the profile's serialized publisher. A generated index locates documents and never overrides them. See [shared projects](docs/shared-projects.md). Package v0.7.0 includes this extension. The core communication rules above are v0.7.
+A project may explicitly bind several repositories to one local record home. The resolved home overrides the repository-name default. An unbound repository retains the default; a marked but invalid binding stops writes. Shared records retain repository and check-context provenance. Only the lead publishes records through the profile's serialized publisher. A generated index locates documents and never overrides them. See [shared projects](docs/shared-projects.md). Package v0.7.0 includes this extension. The core communication rules above are v0.8.
