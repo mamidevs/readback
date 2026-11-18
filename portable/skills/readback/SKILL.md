@@ -187,7 +187,7 @@ The helper prints one of the two receipt forms.
 
 The helper output starts with these lines. Its first three lines identify the verdict, the execution and the receipt. The third line is the receipt. A receipt changes no verdict.
 
-The first line takes one of five forms. In the modes off and skipped the helper makes no provider call.
+The first line takes one of five forms. For `off` and `skipped` the helper makes no provider call.
 
 ```
 JUDGE      PASS | <provider:model> | <repo@sha or none> | <note>

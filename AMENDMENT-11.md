@@ -8,9 +8,9 @@ Part 1 gave the outside judge a receipt. Part 2 lets the owner choose how often 
 |---|---|---|
 | Settings, `scripts/readback_settings.py` and `schemas/settings.schema.json` | The judge route, the mode and the round limit had no local settings file. | The script reads and writes `settings.json` in the project home with the commands show, set and migrate-teammates. The schema holds the shape of the file. |
 | Session state, `scripts/readback_session.py` | A mode choice of the owner had no place to stay between prompts. | The module keeps the mode override of one session and the owner's round authorizations in local state files. |
-| Structural validator 2.0.0, `scripts/validate_handoff.py` | The validation result of part 1 blocked nothing. | Version 2.0.0 hardens the validator. Its result now decides whether a provider call runs and whether an acceptance without a judge stands. |
+| Structural validator 2.0.0, `scripts/validate_handoff.py` | The validator of part 1 did not read the sections that a contract holds after `Out of scope:` or a handoff key that ends with a colon, and its result blocked nothing. | Version 2.0.0 reads those sections (Limits, Definitions, Evidence requirements, Coverage list, Command lines) and the keys with a colon. The helper uses the result: false or unavailable blocks a provider call, and an acceptance without a judge needs true. |
 | Judge line, `hooks/judge_line.py` | The owner had no short way to change the mode or to authorize a round. | The hook reads a judge line at UserPromptSubmit, SessionStart and SessionEnd and keeps the session state in step. |
-| Commit observation switch, `hooks/guard_git.py` | The commit observation needs a switch that the owner can set. | `READBACK_COMMIT_CHECK=off` in the Git guard turns the commit observation off. The observation describes and never blocks. |
+| Commit observation switch, `hooks/guard_git.py` | The commit observation had only an environment variable as its switch, and an agent could change the judge settings with a command. | The setting `commit_check` with the value `off` turns the commit observation off for a project; `READBACK_COMMIT_CHECK=off` stays. The guard denies an agent's command that changes the judge settings or touches the session state. The observation describes and never blocks. |
 | Helper modes, `scripts/outside_judge.py` | The helper called a provider for every handoff. | The helper reads the mode and the tier. In the mode off and in a step handoff of the mode gate it prints JUDGE off or JUDGE skipped and makes no provider call. |
 | Round accounting, `scripts/judge_rounds.py` | Nothing limited the number of judge rounds for one piece. | The module keeps one ledger for each project, repository, lineage and tier. The limit is judge.max_fail_rounds. |
 | Legacy home of a linked worktree, `scripts/project_registry.py` | A linked worktree could not find the legacy home of its main worktree. | The registry gives a linked worktree the legacy home that is named after the folder of the main worktree. |
@@ -33,9 +33,11 @@ A step handoff is the handoff of one piece. A gate handoff is the handoff of a p
 
 The owner changes the mode and authorizes a round with a judge line. There are three forms.
 
-- `JUDGE off|gate|each [session]` sets the mode.
+- `JUDGE off|gate|each [session]` sets the mode of this session. The word `session` is optional and changes nothing.
 - `JUDGE default` clears the stored override.
 - `JUDGE round <CON id> <step|gate>` authorizes one round.
+
+The mode of a project is the setting `judge.mode` in its settings file. A judge line does not change that file; it stores an override for one session.
 
 The owner writes a judge line as the first line of a prompt.
 A stored mode override lasts until another judge line replaces it or a cleanup removes it; JUDGE default clears it.

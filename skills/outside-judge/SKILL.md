@@ -14,7 +14,13 @@ The mode of the judge decides whether a provider call runs. In the mode off, and
 ## Steps
 
 1. Store the contract and the handoff as files. They are the stored records `records/<CON id>.md` and `records/<HND id>.md`.
-2. Run the helper in this form. Run the script `${CLAUDE_PLUGIN_ROOT}/scripts/outside-judge.sh` with `bash`, and pass `claude` as the host. Do not change the form.
+2. Run this command. Write `--tier step` for one piece and `--tier gate` for the handoff of a part. Do not change the rest.
+
+```
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/outside-judge.sh" --host claude --tier gate <contract file> <handoff file> <repository folder>
+```
+
+The complete form of the helper's arguments is this.
 
 ```
 outside-judge.sh --host <host> [--tier step|gate] [--lineage <CON id>] [--coverage <file>] <contract file> <handoff file> <repository folder>
