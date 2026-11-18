@@ -801,6 +801,8 @@ class UpdateTests(Guarded):
         self.addCleanup(lambda: os.close(lock) if lock is not None else None)
         fcntl.flock(lock, fcntl.LOCK_EX)
         ready = [self.home.parent / (self.home.name + "-ready-" + name) for name in ready_names]
+        for marker in ready:
+            self.addCleanup(lambda path=marker: path.exists() and path.unlink())
         processes = spawn_all(ready, go)
         deadline = time.monotonic() + 20
         for path in ready:
