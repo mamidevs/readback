@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:readback:settings:1",
+  "title": "Readback settings v1",
+  "description": "The file <project home>/settings.json. Every key except schema_version is optional and takes the default of examples[0] when it is missing. The example is the object of effective defaults; it holds schema_version 1, which is also required in a file.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "judge": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": ["off", "gate", "each"]
+        },
+        "provider": {
+          "const": "opposite"
+        },
+        "routes": {
+          "type": "object",
+          "properties": {
+            "claude": {
+              "$ref": "#/$defs/tiers"
+            },
+            "codex": {
+              "$ref": "#/$defs/tiers"
+            }
+          },
+          "additionalProperties": false
+        },
+        "deadline_seconds": {
+          "type": "object",
+          "properties": {
+            "step": {
+              "$ref": "#/$defs/deadline"
+            },
+            "gate": {
+              "$ref": "#/$defs/deadline"
+            }
+          },
+          "additionalProperties": false
+        },
+        "max_fail_rounds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      },
+      "additionalProperties": false
+    },
+    "commit_check": {
+      "enum": ["off", "observe"]
+    }
+  },
+  "required": ["schema_version"],
+  "additionalProperties": false,
+  "$defs": {
+    "tiers": {
+      "type": "object",
+      "properties": {
+        "step": {
+          "$ref": "#/$defs/route"
+        },
+        "gate": {
+          "$ref": "#/$defs/route"
+        }
+      },
+      "additionalProperties": false
+    },
+    "route": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+        },
+        "effort": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "deadline": {
+      "type": "integer",
+      "minimum": 30,
+      "maximum": 3600
+    }
+  },
+  "examples": [
+    {
+      "schema_version": 1,
+      "judge": {
+        "mode": "gate",
+        "provider": "opposite",
+        "routes": {
+          "claude": {
+            "step": {"model": "fable", "effort": "high"},
+            "gate": {"model": "fable", "effort": "high"}
+          },
+          "codex": {
+            "step": {"model": "gpt-6-astra", "effort": "high"},
+            "gate": {"model": "gpt-6-astra", "effort": "high"}
+          }
+        },
+        "deadline_seconds": {"step": 300, "gate": 900},
+        "max_fail_rounds": 3
+      },
+      "commit_check": "observe"
+    }
+  ]
+}
