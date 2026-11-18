@@ -317,11 +317,22 @@ def _append(path, data):
         os.close(fd)
 
 
-def observe(commands, whole, command, event):
+def commit_check_off(base, host):
+    """True only when the project of the base folder has an effective `commit_check` of `off`. A failure gives False."""
+    try:
+        import readback_settings
+        found = readback_settings.resolve(base, host)
+        return readback_settings.load(found["home"])["settings"]["commit_check"] == "off"
+    except Exception:
+        return False
+
+
+def observe(commands, whole, command, event, host=None):
     """Append one line for the first commit call, or for a failed-parse candidate. Return the file's path, or None.
 
     `commands` is the list of word lists of the command line, `whole` says that every visited text was split,
-    `command` is the raw command line and `event` is the hook input.
+    `command` is the raw command line and `event` is the hook input. With a `host`, a project whose `commit_check`
+    is `off` gets no capture and no line; without one the switch is skipped.
     """
     count, call = find_commit(commands)
     parse = parse_of(count, whole, command)
@@ -335,6 +346,8 @@ def observe(commands, whole, command, event):
     start = _clock()
     common = review_capture.git_common_dir(base)
     if common is None or not os.path.isdir(os.path.join(common, "readback", "reviews")):
+        return None
+    if host is not None and commit_check_off(base, host):
         return None
     if target == "unknown":
         capture, reviews, reviews_state, unmatched = None, None, "no-identity", None

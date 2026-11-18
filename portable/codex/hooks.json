@@ -6,9 +6,45 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.agents/skills/readback/scripts/guard_git.py\"",
+            "command": "python3 \"$HOME/.agents/skills/readback/scripts/guard_git.py\" codex",
             "timeout": 10,
             "statusMessage": "readback: checking Git command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.agents/skills/readback/scripts/judge_line.py\" codex",
+            "timeout": 10,
+            "statusMessage": "readback: reading the judge line"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.agents/skills/readback/scripts/judge_line.py\" codex",
+            "timeout": 10,
+            "statusMessage": "readback: reading the judge line"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.agents/skills/readback/scripts/judge_line.py\" codex",
+            "timeout": 10,
+            "statusMessage": "readback: reading the judge line"
           }
         ]
       }

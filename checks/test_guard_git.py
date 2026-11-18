@@ -213,7 +213,7 @@ class PortableGuardGitTests(GuardGitTests):
 
     def test_codex_config_runs_the_installed_copy_before_bash(self):
         config = json.loads(CODEX_CONFIG.read_text(encoding="utf-8"))
-        self.assertEqual(list(config["hooks"]), ["PreToolUse"])
+        self.assertEqual(list(config["hooks"]), ["PreToolUse", "UserPromptSubmit", "SessionStart", "SessionEnd"])
         entries = config["hooks"]["PreToolUse"]
         self.assertEqual([entry["matcher"] for entry in entries], ["Bash"])
         handler = entries[0]["hooks"][0]

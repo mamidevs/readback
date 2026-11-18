@@ -9,6 +9,9 @@ or when Git there does not resolve it as a revision. The hook does not follow cd
 Codex does not pass the workdir of a command, so the session folder stands in for it.
 A command that the hook does not deny and that holds a Git commit call is also observed: scripts/commit_observation.py
 appends one line to a file below the Git common directory. It prints nothing and never changes the answer.
+The host argument (`claude` or `codex`) comes from the registration. A second deny rule covers the owner's judge
+settings and session state: a simple command that runs readback_settings.py with `set`, or with `migrate-teammates`
+and `--write`, or that holds a word with `.readback/sessions`, is denied. It is a syntactic safety net with gaps.
 """
 
 import json
@@ -259,6 +262,29 @@ def holds_commit(commands):
     return False
 
 
+def settings_text(commands):
+    """The text of the first simple command that changes the judge settings or touches the session state, or None."""
+    for words in commands:
+        matched = any(".readback/sessions" in word for word in words)
+        for index, word in enumerate(words):
+            if word.split("/")[-1] != "readback_settings.py":
+                continue
+            later = words[index + 1:]
+            if "set" in later or ("migrate-teammates" in later and "--write" in later):
+                matched = True
+        if matched:
+            return " ".join(words)[:120]
+    return None
+
+
+def deny(reason):
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": reason,
+    }}))
+
+
 def main():
     try:
         event = json.load(sys.stdin)
@@ -270,19 +296,28 @@ def main():
     if not isinstance(command, str):
         return 0
     cwd = event.get("cwd") if isinstance(event.get("cwd"), str) else "."
+    host = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ("claude", "codex") else None
     found = check(command, cwd)
     if not found:
-        if os.environ.get("READBACK_COMMIT_CHECK") != "off":
-            try:
-                commands, whole = simple_commands(command)
-                if holds_commit(commands) or (not whole and CANDIDATE.search(command)):
-                    here = os.path.dirname(os.path.abspath(__file__))
-                    sys.dont_write_bytecode = True
-                    sys.path[:0] = [here, os.path.join(os.path.dirname(here), "scripts")]
-                    import commit_observation
+        try:
+            commands, whole = simple_commands(command)
+            owned = settings_text(commands)
+            if owned:
+                deny(f"readback blocks {owned}. Only the owner changes the judge settings and the session state. "
+                     "Tell the owner the command; the owner can run it in a terminal.")
+                return 0
+            if os.environ.get("READBACK_COMMIT_CHECK") != "off" and (
+                    holds_commit(commands) or (not whole and CANDIDATE.search(command))):
+                here = os.path.dirname(os.path.abspath(__file__))
+                sys.dont_write_bytecode = True
+                sys.path[:0] = [here, os.path.join(os.path.dirname(here), "scripts")]
+                import commit_observation
+                if host is None:
                     commit_observation.observe(commands, whole, command, event)
-            except Exception:
-                pass
+                else:
+                    commit_observation.observe(commands, whole, command, event, host)
+        except Exception:
+            pass
         return 0
     if event.get("agent_type"):
         reason = (f"readback blocks `{found}`. It can discard changes that you did not make. "
@@ -290,11 +325,7 @@ def main():
     else:
         reason = (f"readback blocks `{found}`. It can discard changes that another person or agent made. "
                   "Tell the owner the command and the reason. The owner can run it outside the agent.")
-    print(json.dumps({"hookSpecificOutput": {
-        "hookEventName": "PreToolUse",
-        "permissionDecision": "deny",
-        "permissionDecisionReason": reason,
-    }}))
+    deny(reason)
     return 0
 
 
