@@ -574,7 +574,7 @@ class GuardTests(WorldCase):
 
 PLUGIN_FILES = ("scripts/outside-judge.sh", "scripts/outside_judge.py", "scripts/review_capture.py",
                 "scripts/review_receipt.py", "scripts/validate_handoff.py", "scripts/readback_settings.py",
-                "scripts/readback_session.py", "scripts/project_registry.py", "agents/judge.md")
+                "scripts/readback_session.py", "scripts/project_registry.py", "scripts/judge_rounds.py", "agents/judge.md")
 RECEIPT_RE = r"^receipt    [0-9a-f]{32} \| ends-equal \| validation true \| .+$"
 
 

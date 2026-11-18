@@ -6,6 +6,7 @@ Only the lead persists the complete output below its stored HANDOFF.
 """
 
 import argparse
+import contextlib
 import io
 import json
 import math
@@ -33,6 +34,10 @@ try:
     import validate_handoff
 except Exception:
     validate_handoff = None
+try:
+    import judge_rounds  # the round accounting: without it no provider call and no record are possible
+except Exception:
+    judge_rounds = None
 
 
 class JudgeError(Exception):
@@ -287,6 +292,7 @@ def stop_group(process):
 
 
 def run_process(command, prompt, repo, env, seconds):
+    """Run the provider in its own process group. A watchdog ends the group also when the helper is killed."""
     try:
         process = subprocess.Popen(
             command, cwd=repo, env=env, stdin=subprocess.PIPE,
@@ -296,6 +302,14 @@ def run_process(command, prompt, repo, env, seconds):
     except OSError as exc:
         raise JudgeError("could not start the judge command") from exc
     try:
+        watchdog = judge_rounds.start_reaper(process.pid, seconds)
+    except Exception as exc:
+        stop_group(process)
+        raise JudgeError("could not start the judge command") from exc
+    except BaseException:
+        stop_group(process)
+        raise
+    try:
         stdout, _stderr = process.communicate(prompt, timeout=seconds)
     except subprocess.TimeoutExpired as exc:
         stop_group(process)
@@ -303,6 +317,8 @@ def run_process(command, prompt, repo, env, seconds):
     except BaseException:
         stop_group(process)
         raise
+    finally:
+        judge_rounds.stop_reaper(watchdog)
     if process.returncode != 0:
         raise JudgeError("the judge command ended with code " + str(process.returncode))
     return stdout
@@ -507,6 +523,12 @@ def no_review_receipt(repo, result, inputs, validation, call):
     return review_receipt.receipt_line(record["attempt_id"], "no review", validation, path)
 
 
+def lineage_argument(text):
+    if not re.fullmatch(r"CON-[0-9]{8}-[0-9]{2}", text):
+        raise argparse.ArgumentTypeError("the lineage must be CON-YYYYMMDD-NN")
+    return text
+
+
 def deadline(env, settings, tier):
     """The deadline in seconds and its source: the environment variable, else the settings of the tier."""
     if "READBACK_JUDGE_SECONDS" in env:
@@ -531,6 +553,7 @@ def main(argv=None):
         parser = Parser(description=__doc__)
         parser.add_argument("--host")
         parser.add_argument("--tier", choices=("step", "gate"), default="gate")
+        parser.add_argument("--lineage", type=lineage_argument)
         parser.add_argument("contract", type=Path)
         parser.add_argument("handoff", type=Path)
         parser.add_argument("repository", nargs="?", type=Path, default=Path.cwd())
@@ -539,6 +562,8 @@ def main(argv=None):
         if env.get("READBACK_JUDGE_ACTIVE"):
             raise JudgeError("a judge cannot start another judge")
         host = detect_host(args.host, env)
+        if judge_rounds is None:
+            raise JudgeError("the settings modules are not available")
         route = DEFAULTS[host]
         repo = args.repository.resolve()
         if not repo.is_dir():
@@ -571,6 +596,8 @@ def main(argv=None):
                 "mode_source": mode_source, "project_home": project["home"], "settings_digest": loaded["digest"],
                 "settings_source": loaded["source"]}
         raw_contract, raw_handoff, contract_text, handoff_text = read_inputs(args.contract, args.handoff)
+        lineage = args.lineage or judge_rounds.lineage_of(contract_text)
+        call["lineage"] = lineage
         validate = validate_handoff.validate if validate_handoff is not None else None
         if review_receipt is None:
             validation = {"valid": "unavailable", "reason": "validator not importable"}
@@ -593,6 +620,8 @@ def main(argv=None):
             raise JudgeError("the handoff fails structural validation (" + str(defect_count(validation)) + " defects)")
         if validation["valid"] not in (True, "unparsed"):
             raise JudgeError("the structural validator is not available")
+        if lineage is None:
+            raise JudgeError("the contract has no CON id; pass --lineage")
         if loaded["source"] == "file":
             provider = DEFAULTS[host].provider
             chosen = settings["judge"]["routes"][provider][args.tier]
@@ -612,10 +641,23 @@ def main(argv=None):
         with tempfile.TemporaryDirectory(prefix="readback-judge-") as folder:
             answer_path = Path(folder) / "answer.txt"
             command = adapter_command(route, executable, repo, answer_path, env)
+            try:
+                reservation = judge_rounds.reserve(
+                    host, session_id, project["home"], project["repository"], lineage, args.tier, loaded["digest"],
+                    settings["judge"]["max_fail_rounds"],
+                    {"provider": route.provider, "model": route.model, "effort": route.effort, "source": route.source},
+                    call["deadline_seconds"])
+            except judge_rounds.RoundError as exc:
+                raise JudgeError(exc.note) from exc
+            call["round"] = reservation.record
             receipt = none_receipt("interrupted")
             state = start_receipt(repo, route, rules, (args.contract, args.handoff, raw_contract, raw_handoff), call)
             reported, models = "", None
             try:
+                try:
+                    judge_rounds.confirm(reservation)
+                except judge_rounds.RoundError as exc:
+                    raise JudgeError(exc.note) from exc
                 stdout = run_process(command, prompt, repo, env, seconds)
                 if route.provider == "claude":
                     answer, reported, models = claude_answer(stdout, route.model)
@@ -625,9 +667,23 @@ def main(argv=None):
                     except (OSError, UnicodeError) as exc:
                         raise JudgeError("Codex returned no readable answer") from exc
                 verdict = first_verdict(answer)
-            except JudgeError:
+            except JudgeError as error:
+                failure = error
+                try:
+                    judge_rounds.finish(reservation, "none")
+                except judge_rounds.RoundError as accounting:
+                    failure = JudgeError(accounting.note)  # D7: the accounting note wins over the provider's error
                 receipt = finish_receipt(state, repo, validation, "none", None, models, 3)
+                raise failure
+            except (KeyboardInterrupt, InterruptedError):
+                with contextlib.suppress(judge_rounds.RoundError):
+                    judge_rounds.finish(reservation, "none")
                 raise
+            try:
+                judge_rounds.finish(reservation, verdict)
+            except judge_rounds.RoundError as exc:
+                receipt = finish_receipt(state, repo, validation, "none", None, models, 3)
+                raise JudgeError(exc.note) from exc
             matched = (route.provider == "claude" and route.model.startswith("claude-")
                        and models is not None and set(models) == {route.model})
             receipt = finish_receipt(state, repo, validation, verdict, answer, models, 0,

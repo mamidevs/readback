@@ -325,7 +325,7 @@ class OutsideJudgeTests(unittest.TestCase):
         bundle = self.base / "bundle 'quoted'"
         bundle.mkdir()
         for name in ("outside_judge.py", "review_receipt.py", "review_capture.py", "validate_handoff.py",
-                     "readback_settings.py", "readback_session.py", "project_registry.py"):
+                     "readback_settings.py", "readback_session.py", "project_registry.py", "judge_rounds.py"):
             shutil.copy2(ROOT / "scripts" / name, bundle / name)
         shutil.copy2(WRAPPER, bundle / WRAPPER.name)
         (bundle / "judge.md").write_text("---\nname: bundled\n---\nBUNDLED RULES: start with PASS or FAIL.\n")

@@ -1008,7 +1008,9 @@ def expect_records(test, repo, run, contract_bytes, handoff_bytes, *, route, ver
     call = {"host": host, "session_id": None, "tier": "gate", "mode": "gate",
             "mode_source": {"kind": "project", "settings_source": "defaults"}, "project_home": project_home,
             "settings_digest": readback_settings.load(project_home)["digest"], "settings_source": "defaults",
-            "deadline_seconds": int(seconds) if seconds == int(seconds) else seconds, "deadline_source": "env"}
+            "deadline_seconds": int(seconds) if seconds == int(seconds) else seconds, "deadline_source": "env",
+            "lineage": "CON-20261117-01",  # D1: the id of the fixture contract
+            "round": {"attempt": 1, "fails_before": 0, "authorization": None}}  # D9: the first attempt of a chain
     expected_started = {
         "schema_version": 1, "attempt_id": attempt, "review_key": key, "created": created,
         "repository": {"root_name": repo.name, "worktree_root": str(repo), "head": head, "branch": "main"},

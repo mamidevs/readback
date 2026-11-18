@@ -38,7 +38,7 @@ import validate_handoff  # noqa: E402
 
 REAL_GIT = shutil.which("git")
 BUNDLE_FILES = ("outside_judge.py", "review_receipt.py", "review_capture.py", "validate_handoff.py",
-                "readback_settings.py", "readback_session.py", "project_registry.py")
+                "readback_settings.py", "readback_session.py", "project_registry.py", "judge_rounds.py")
 AT = "2026-11-18T10:00:00Z"
 STARTED = "see the complete answer below"
 
@@ -186,10 +186,15 @@ class JudgeCase(unittest.TestCase):
         call = {"host": host, "session_id": sid, "tier": tier, "mode": mode, "mode_source": mode_source,
                 "project_home": str(self.project_home),
                 "settings_digest": readback_settings.load(str(self.project_home))["digest"],
-                "settings_source": settings_source}
+                "settings_source": settings_source, "lineage": "CON-20261117-01"}  # D1, D9
         if seconds is not None:
-            call.update(deadline_seconds=seconds, deadline_source=source)
+            call.update(deadline_seconds=seconds, deadline_source=source,
+                        round={"attempt": 1, "fails_before": 0, "authorization": None})  # D9
         return call
+
+    def forget_rounds(self):
+        """Start a new chain: a row that changes the settings of one lineage and tier begins without a ledger (D5)."""
+        shutil.rmtree(self.home / "logbook" / ".readback" / "rounds", ignore_errors=True)
 
     def assert_no_records(self):
         self.assertFalse((self.common / "readback").exists())
@@ -561,6 +566,7 @@ class RouteTests(JudgeCase):
                 ("R14", "fable", ["claude-opus-5-5"], "none", 3, "UNVERIFIED")):
             with self.subTest(row=name):
                 shutil.rmtree(self.common / "readback")
+                self.forget_rounds()
                 self.write_settings({"judge": {"mode": "each", "routes": {"claude": {"gate": {"model": model, "effort": "medium"}}}}})
                 result, _done = self.route_row("codex", "gate", "claude", model, "medium", usage, word=word, code=code, match=match)
                 if word == "PASS":
@@ -595,6 +601,7 @@ class RouteTests(JudgeCase):
             self.assertEqual((call["deadline_seconds"], call["deadline_source"]), (expected, source))
             self.assertIs(type(call["deadline_seconds"]), type(expected))  # the parsed JSON value: int, never 45.0
         shutil.rmtree(self.common / "readback")
+        self.forget_rounds()
 
     def test_t1_t2_t3_t5_the_deadline_and_its_source(self):
         self.deadline_row("gate", 900, "settings")  # T1
@@ -663,7 +670,7 @@ class RecordTests(JudgeCase):
         expected = self.expected_call("claude", "sess-1", "step", "each", SESSION, "file", 300, "settings")
         self.assertEqual(sorted(expected), sorted(["host", "session_id", "tier", "mode", "mode_source", "project_home",
                                                     "settings_digest", "settings_source", "deadline_seconds",
-                                                    "deadline_source"]))
+                                                    "deadline_source", "lineage", "round"]))
         started, completed = self.records("started")[0], self.records("completed")[0]
         self.assertEqual(started["call"], expected)
         self.assertEqual(completed["call"], expected)
@@ -746,7 +753,8 @@ class RecordTests(JudgeCase):
         self.assertEqual(record["helper_version"], {"file_sha256": review_receipt.sha256_hex(HELPER.read_bytes())})
         self.assertEqual(record["validation"], validate_handoff.validate(CONTRACT_TRUE, HANDOFF_TRUE))
         self.assertEqual(sorted(record["call"]), sorted(["host", "session_id", "tier", "mode", "mode_source",
-                                                         "project_home", "settings_digest", "settings_source"]))
+                                                         "project_home", "settings_digest", "settings_source",
+                                                         "lineage"]))
         self.assertEqual(stat.S_IMODE(files[0].stat().st_mode), 0o600)
         self.assertEqual(stat.S_IMODE(folder.stat().st_mode), 0o700)
         self.assertEqual(stat.S_IMODE((self.common / "readback").stat().st_mode), 0o700)
