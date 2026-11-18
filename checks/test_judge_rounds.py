@@ -194,8 +194,9 @@ class Rounds(base.JudgeCase):
         return self.home / "logbook" / ".readback" / "rounds"
 
     def room(self):
+        """The files of the rounds folder: ledgers, locks and any temporary file. A folder of kept texts is not listed."""
         folder = self.rounds_dir()
-        return sorted(item.name for item in folder.iterdir()) if folder.exists() else None
+        return sorted(item.name for item in folder.iterdir() if not item.is_dir()) if folder.exists() else None
 
 
 # ---------------------------------------------------------------------------------------------- LedgerTests
