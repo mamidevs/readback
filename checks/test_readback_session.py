@@ -423,7 +423,7 @@ class StateTests(SelfChecks, WithTemp):
                 expected = os.path.join(self.base, host + "-" + sid + ".json")
                 self.assertTrue(os.path.isfile(expected), expected)
                 self.assertEqual(self.read(host, sid), ("valid", state_of(
-                    host, sid, "each", {"id": "m-" + sid, "at": AT})))
+                    host, sid, "each", {"id": "m-" + sid, "at": AT}, processed=["m-" + sid])))
                 rs.clear(host, sid, self.base)
                 self.assertFalse(os.path.exists(expected))
         self.assertEqual(len(ALL_IDS_SAFE[9]), 128)
@@ -470,7 +470,8 @@ class StateTests(SelfChecks, WithTemp):
             rs.set_mode("claude", SID, "off", "m1", AT)
             expected = os.path.join(self.root, "logbook", ".readback", "sessions", "claude-sess-1.json")
             self.assertTrue(os.path.isfile(expected))
-            self.assertEqual(rs.read("claude", SID), ("valid", state_of(mode="off", mode_event={"id": "m1", "at": AT})))
+            self.assertEqual(rs.read("claude", SID), ("valid", state_of(
+                mode="off", mode_event={"id": "m1", "at": AT}, processed=["m1"])))
             rs.authorize("claude", SID, "e1", AT, "p", "r", "l", "step", "d")
             self.assertEqual(rs.consume("claude", SID, "p", "r", "l", "step", "d"),
                              {"event_id": "e1", "at": AT, "project_home": "p", "repository": "r", "lineage": "l",
@@ -514,8 +515,9 @@ class StateTests(SelfChecks, WithTemp):
                     shutil.rmtree(self.base, ignore_errors=True)
                     self.assertIsNone(self.set_mode(mode, "m1", AT, host))
                     self.assertEqual(self.read(host), ("valid", state_of(
-                        host, SID, mode, {"id": "m1", "at": AT})))
-                    self.assertEqual(json.loads(self.raw(host)), state_of(host, SID, mode, {"id": "m1", "at": AT}))
+                        host, SID, mode, {"id": "m1", "at": AT}, processed=["m1"])))
+                    self.assertEqual(json.loads(self.raw(host)), state_of(
+                        host, SID, mode, {"id": "m1", "at": AT}, processed=["m1"]))
                     self.assertEqual(sorted(os.listdir(self.base)), [host + "-sess-1.json", host + "-sess-1.lock"])
 
     def test_set_mode_on_an_existing_state_keeps_the_authorizations_and_processed_events(self):
@@ -523,16 +525,19 @@ class StateTests(SelfChecks, WithTemp):
         self.authorize("e2", AT2, tier="gate")
         authorizations = [authorization("e1"), authorization("e2", AT2, tier="gate")]
         sequence = [("off", "m1", AT), ("gate", "m2", AT2), ("each", "m3", AT), (None, "m4", AT2), ("off", "m5", AT)]
+        stored = ["e1", "e2"]
         for mode, event, at in sequence:
             self.set_mode(mode, event, at)
+            stored.append(event)
             self.assertEqual(self.read(), ("valid", state_of(
                 mode=mode, mode_event={"id": event, "at": at}, authorizations=authorizations,
-                processed=["e1", "e2"])), (mode, event))
+                processed=stored)), (mode, event))
 
     def test_set_mode_null_keeps_mode_event_as_provenance(self):
         self.set_mode("each", "m1", AT)
         self.set_mode(None, "m2", AT2)
-        self.assertEqual(self.read(), ("valid", state_of(mode=None, mode_event={"id": "m2", "at": AT2})))
+        self.assertEqual(self.read(), ("valid", state_of(
+            mode=None, mode_event={"id": "m2", "at": AT2}, processed=["m1", "m2"])))
 
     def test_set_mode_with_the_same_event_id_changes_nothing(self):
         self.set_mode("off", "m1", AT)
@@ -547,16 +552,21 @@ class StateTests(SelfChecks, WithTemp):
         self.set_mode("off", "m2", AT2)
         self.assertEqual(self.read()[1]["mode_event"], {"id": "m2", "at": AT2})
         self.assertNotEqual(snapshot(self.base)["claude-sess-1.json"], before["claude-sess-1.json"])
-        # an old event id that is not the current one is a change too
+        # an old event id that is not the current one changes nothing either (D2)
+        after = snapshot(self.base)
         self.set_mode("gate", "m1", AT)
-        self.assertEqual(self.read()[1]["mode"], "gate")
-        self.assertEqual(self.read()[1]["mode_event"], {"id": "m1", "at": AT})
+        self.assertEqual(snapshot(self.base), after)
+        self.assertEqual(self.read()[1]["mode"], "off")
+        self.assertEqual(self.read()[1]["mode_event"], {"id": "m2", "at": AT2})
+        self.assertEqual(self.read()[1]["processed_events"], ["m1", "e1", "m2"])
 
-    def test_set_mode_event_id_equal_to_an_authorization_event_id_still_changes_the_mode(self):
+    def test_set_mode_event_id_equal_to_an_authorization_event_id_changes_nothing(self):
         self.authorize("same")
+        before = snapshot(self.base)
         self.set_mode("each", "same", AT2)
-        self.assertEqual(self.read()[1]["mode"], "each")
-        self.assertEqual(self.read()[1]["mode_event"], {"id": "same", "at": AT2})
+        self.assertEqual(snapshot(self.base), before)
+        self.assertEqual(self.read()[1]["mode"], None)
+        self.assertEqual(self.read()[1]["mode_event"], None)
 
     # D7
     def test_clear_removes_the_file_and_is_quiet_without_one(self):
@@ -640,7 +650,7 @@ class StateTests(SelfChecks, WithTemp):
         try:
             rs.set_mode("claude", SID, "off", "m1", AT, "rel-base")
             self.assertEqual(rs.read("claude", SID, "rel-base"), ("valid", state_of(
-                mode="off", mode_event={"id": "m1", "at": AT})))
+                mode="off", mode_event={"id": "m1", "at": AT}, processed=["m1"])))
         finally:
             os.chdir(old)
         self.assertTrue(os.path.isfile(os.path.join(self.root, "rel-base", "claude-sess-1.json")))
@@ -663,7 +673,7 @@ class StateTests(SelfChecks, WithTemp):
 
         with mock.patch.object(rs, "_rename", rename), mock.patch.object(rs, "_sync_dir", sync):
             self.set_mode("off", "m1")
-        expected = state_of(mode="off", mode_event={"id": "m1", "at": AT})
+        expected = state_of(mode="off", mode_event={"id": "m1", "at": AT}, processed=["m1"])
         self.assertEqual(len(events), 2)
         kind, folder, name, destination, mode, content, held = events[0]
         self.assertEqual((kind, folder, destination, mode, content, held),
@@ -792,7 +802,8 @@ class AuthorizationTests(SelfChecks, WithTemp):
         self.set_mode("each", "m1")
         self.authorize("e1")
         self.assertEqual(self.read(), ("valid", state_of(
-            mode="each", mode_event={"id": "m1", "at": AT}, authorizations=[authorization("e1")], processed=["e1"])))
+            mode="each", mode_event={"id": "m1", "at": AT}, authorizations=[authorization("e1")],
+            processed=["m1", "e1"])))
 
     def test_a_second_authorize_with_the_same_event_id_adds_nothing(self):
         self.authorize("e1")
@@ -883,7 +894,7 @@ class AuthorizationTests(SelfChecks, WithTemp):
         for index, mode in enumerate(("off", "gate", "each", None)):
             self.set_mode(mode, "m%d" % index)
             self.assertEqual(self.read()[1]["authorizations"], [authorization("e1"), authorization("e2", AT2, tier="gate")])
-            self.assertEqual(self.read()[1]["processed_events"], ["e1", "e2"])
+            self.assertEqual(self.read()[1]["processed_events"], ["e1", "e2"] + ["m%d" % n for n in range(index + 1)])
         self.assertEqual(self.consume(), authorization("e1"))
 
     def test_states_of_two_sessions_and_two_hosts_are_separate(self):
@@ -948,7 +959,7 @@ class AuthorizationTests(SelfChecks, WithTemp):
         self.authorize("e1")
         self.authorize("e2")
         self.assertEqual(self.consume(), authorization("e1"))
-        self.assertEqual(self.read()[1]["processed_events"], ["e1", "e2"])
+        self.assertEqual(self.read()[1]["processed_events"], ["m1", "e1", "e2"])
         rs.clear("claude", SID, self.base)
         self.assertEqual(self.read(), ("absent", None))
         self.assertEqual(os.listdir(self.base), ["claude-sess-1.lock"])
@@ -957,7 +968,163 @@ class AuthorizationTests(SelfChecks, WithTemp):
         self.set_mode("gate", "m1", AT2)
         self.assertEqual(self.read(), ("valid", state_of(
             mode="gate", mode_event={"id": "m1", "at": AT2}, authorizations=[authorization("e1")],
-            processed=["e1"])))
+            processed=["e1", "m1"])))
+
+
+# ----------------------------------------------------------------- CON-20261118-15: replayed events
+
+AT3 = "2026-11-17T10:20:32Z"
+
+
+class ReplayTests(WithTemp):
+    """An event id acts once while the state file lives, as a mode event or as a round event (D1 to D3)."""
+
+    def count_renames(self):
+        calls = []
+        real = rs._rename
+
+        def spy(source, destination):
+            calls.append(destination)
+            real(source, destination)
+
+        return calls, mock.patch.object(rs, "_rename", spy)
+
+    def test_a_replayed_mode_event_after_a_later_event_changes_nothing(self):
+        self.set_mode("off", "A", AT)
+        self.set_mode("each", "B", AT2)
+        before = snapshot(self.base)
+        calls, patch = self.count_renames()
+        with patch:
+            self.assertIsNone(self.set_mode("off", "A", AT3))
+        self.assertEqual(calls, [])
+        self.assertEqual(snapshot(self.base), before)  # bytes, mode, inode and time of every file
+        self.assertEqual(self.read(), ("valid", state_of(
+            mode="each", mode_event={"id": "B", "at": AT2}, processed=["A", "B"])))
+
+    def test_a_replay_changes_nothing_whatever_the_mode_and_the_time_of_the_call(self):
+        self.set_mode("off", "A", AT)
+        self.set_mode("each", "B", AT2)
+        before = snapshot(self.base)
+        for mode in ("off", "gate", "each", None):
+            for at in (AT, AT2, AT3):
+                for event in ("A", "B"):
+                    self.assertIsNone(self.set_mode(mode, event, at))
+                    self.assertEqual(snapshot(self.base), before, (mode, at, event))
+        self.assertEqual(self.read()[1]["processed_events"], ["A", "B"])
+
+    def test_each_event_id_is_stored_once_and_in_the_order_stored(self):
+        for mode, event, at in (("off", "A", AT), ("each", "B", AT2), ("off", "A", AT3), ("gate", "C", AT3),
+                                ("each", "B", AT), ("off", "C", AT2), (None, "D", AT3), ("gate", "A", AT)):
+            self.set_mode(mode, event, at)
+        self.assertEqual(self.read(), ("valid", state_of(
+            mode=None, mode_event={"id": "D", "at": AT3}, processed=["A", "B", "C", "D"])))
+
+    def test_one_effective_set_mode_is_one_publication_with_mode_event_and_id_together(self):
+        calls, patch = self.count_renames()
+        with patch:
+            self.set_mode("each", "A", AT)
+            self.set_mode("off", "B", AT2)
+            self.set_mode("gate", "A", AT3)
+        self.assertEqual(calls, [self.path(), self.path()])
+        self.assertEqual(self.read()[1]["mode"], "off")
+
+    def test_a_set_mode_with_an_event_id_that_an_authorize_used_changes_nothing(self):
+        self.set_mode("off", "M", AT)
+        self.authorize("R", AT2)
+        before = snapshot(self.base)
+        for mode in ("off", "gate", "each", None):
+            self.assertIsNone(self.set_mode(mode, "R", AT3))
+            self.assertEqual(snapshot(self.base), before, mode)
+        self.assertEqual(self.read(), ("valid", state_of(
+            mode="off", mode_event={"id": "M", "at": AT}, authorizations=[authorization("R", AT2)],
+            processed=["M", "R"])))
+
+    def test_an_authorize_with_an_event_id_that_a_set_mode_used_adds_nothing(self):
+        self.set_mode("each", "M", AT)
+        before = snapshot(self.base)
+        self.assertIsNone(self.authorize("M", AT2))
+        self.assertIsNone(self.authorize("M", AT3, **DIFFERENT))
+        self.assertEqual(snapshot(self.base), before)
+        self.assertEqual(self.read(), ("valid", state_of(
+            mode="each", mode_event={"id": "M", "at": AT}, processed=["M"])))
+        self.assertIsNone(self.consume())
+
+    def test_an_event_id_used_by_set_mode_then_replaced_as_mode_event_still_blocks_authorize(self):
+        self.set_mode("each", "M1", AT)
+        self.set_mode("off", "M2", AT2)  # M1 is no longer the mode_event
+        before = snapshot(self.base)
+        self.authorize("M1", AT3)
+        self.assertEqual(snapshot(self.base), before)
+
+    def test_after_clear_the_same_event_ids_act_again(self):
+        self.set_mode("off", "A", AT)
+        self.authorize("R", AT2)
+        self.set_mode("each", "B", AT3)
+        self.assertEqual(self.consume(), authorization("R", AT2))
+        rs.clear("claude", SID, self.base)
+        self.assertEqual(self.read(), ("absent", None))
+        self.set_mode("gate", "A", AT3)
+        self.assertEqual(self.read(), ("valid", state_of(
+            mode="gate", mode_event={"id": "A", "at": AT3}, processed=["A"])))
+        self.authorize("R", AT2)
+        self.set_mode("off", "B", AT)
+        self.assertEqual(self.read(), ("valid", state_of(
+            mode="off", mode_event={"id": "B", "at": AT}, authorizations=[authorization("R", AT2)],
+            processed=["A", "R", "B"])))
+
+    def test_set_mode_to_null_with_a_new_event_id_stores_it_and_a_replay_of_it_changes_nothing(self):
+        self.set_mode("each", "A", AT)
+        self.set_mode(None, "N", AT2)
+        self.assertEqual(self.read(), ("valid", state_of(
+            mode=None, mode_event={"id": "N", "at": AT2}, processed=["A", "N"])))
+        before = snapshot(self.base)
+        self.set_mode("gate", "N", AT3)
+        self.set_mode(None, "A", AT3)
+        self.assertEqual(snapshot(self.base), before)
+        self.set_mode("gate", "G", AT3)
+        self.assertEqual(self.read()[1]["mode"], "gate")
+
+    def test_the_states_of_two_hosts_and_two_sessions_remember_their_own_event_ids(self):
+        self.set_mode("off", "A", AT)
+        self.set_mode("each", "A", AT2, "codex")
+        self.set_mode("gate", "A", AT3, "claude", "sess-2")
+        self.assertEqual(self.read("claude")[1]["mode"], "off")
+        self.assertEqual(self.read("codex")[1]["mode"], "each")
+        self.assertEqual(self.read("claude", "sess-2")[1]["mode"], "gate")
+        self.set_mode("each", "A", AT3)  # a replay in the first state only
+        self.assertEqual(self.read("claude")[1]["mode"], "off")
+
+    def test_a_state_file_of_the_earlier_shape_reads_as_valid_and_accepts_new_events(self):
+        # the earlier code did not put the id of the mode_event into processed_events
+        old = state_of(mode="off", mode_event={"id": "old", "at": AT}, authorizations=[authorization("e1")],
+                       processed=["e1"])
+        self.put(jbytes(old))
+        self.assertEqual(self.read(), ("valid", old))
+        self.set_mode("each", "new", AT2)
+        self.assertEqual(self.read(), ("valid", state_of(
+            mode="each", mode_event={"id": "new", "at": AT2}, authorizations=[authorization("e1")],
+            processed=["e1", "new"])))
+        self.authorize("e2", AT2)
+        self.assertEqual(self.read()[1]["processed_events"], ["e1", "new", "e2"])
+        self.authorize("e1", AT3)  # a round event that the file holds is still remembered
+        self.assertEqual(self.read()[1]["processed_events"], ["e1", "new", "e2"])
+
+    def test_in_a_state_file_of_the_earlier_shape_a_replay_of_its_old_mode_event_is_not_prevented(self):
+        old = state_of(mode="off", mode_event={"id": "old", "at": AT}, processed=[])
+        self.put(jbytes(old))
+        self.assertEqual(self.read(), ("valid", old))
+        self.set_mode("gate", "old", AT2)  # the stated limit: the old id is not in the list
+        self.assertEqual(self.read(), ("valid", state_of(
+            mode="gate", mode_event={"id": "old", "at": AT2}, processed=["old"])))
+        before = snapshot(self.base)
+        self.set_mode("each", "old", AT3)  # now it is remembered
+        self.assertEqual(snapshot(self.base), before)
+        # the same file, after the old event was replaced by a new one, is not protected against the old id
+        self.put(jbytes(old))
+        self.set_mode("each", "new", AT2)
+        self.set_mode("off", "old", AT3)
+        self.assertEqual(self.read(), ("valid", state_of(
+            mode="off", mode_event={"id": "old", "at": AT3}, processed=["new", "old"])))
 
 
 # ----------------------------------------------------------------- ACC-3
@@ -1100,6 +1267,54 @@ class ConcurrencyTests(WithTemp):
             self.assertEqual(self.finish(proc), (0, {"result": None}, ""))
         self.assertEqual(self.read(), ("valid", state_of(authorizations=[authorization("same")], processed=["same"])))
 
+    def test_eight_processes_deliver_one_mode_event_and_leave_it_once(self):
+        procs = [self.spawn("set_mode", "claude", SID, "each", "m1", AT2, base=self.base, delay=0.05)
+                 for _ in range(8)]
+        for proc in procs:
+            self.go(proc)
+        for proc in procs:
+            self.assertEqual(self.finish(proc), (0, {"result": None}, ""))
+        self.assertEqual(self.read(), ("valid", state_of(
+            mode="each", mode_event={"id": "m1", "at": AT2}, processed=["m1"])))
+        self.only_state_and_lock()
+
+    def test_eight_processes_deliver_eight_mode_events_and_leave_all_eight_remembered(self):
+        modes = ["off", "gate", "each", None] * 2
+        events = ["m%d" % number for number in range(8)]
+        procs = [self.spawn("set_mode", "claude", SID, mode, event, AT2, base=self.base, delay=0.05)
+                 for mode, event in zip(modes, events)]
+        for proc in procs:
+            self.go(proc)
+        for proc in procs:
+            self.assertEqual(self.finish(proc), (0, {"result": None}, ""))
+        kind, state = self.read()
+        self.assertEqual(kind, "valid")
+        self.assertEqual(sorted(state["processed_events"]), events)
+        self.assertEqual(len(state["processed_events"]), 8)
+        self.assertIn(state["mode_event"]["id"], events)
+        self.assertEqual(state["mode_event"], {"id": state["mode_event"]["id"], "at": AT2})
+        self.assertEqual(state["mode"], modes[events.index(state["mode_event"]["id"])])
+        self.assertEqual(state, state_of(mode=state["mode"], mode_event=state["mode_event"],
+                                         processed=state["processed_events"]))
+        self.only_state_and_lock()
+
+    def test_eight_processes_deliver_one_event_id_as_a_mode_event_and_as_a_round_event_and_leave_one(self):
+        procs = []
+        for number in range(8):
+            if number % 2:
+                procs.append(self.spawn("set_mode", "claude", SID, "each", "x", AT2, base=self.base, delay=0.05))
+            else:
+                procs.append(self.spawn("authorize", "claude", SID, "x", AT, *self.fields(), base=self.base,
+                                        delay=0.05))
+        for proc in procs:
+            self.go(proc)
+        for proc in procs:
+            self.assertEqual(self.finish(proc), (0, {"result": None}, ""))
+        kind, state = self.read()
+        self.assertEqual(kind, "valid")
+        self.assertEqual(state["processed_events"], ["x"])
+        self.assertEqual(len(state["authorizations"]) + (state["mode_event"] is not None), 1)
+
     def test_set_mode_and_authorize_at_the_same_time_both_show(self):
         for round_number, order in enumerate(("mode first", "authorize first", "mode first")):
             sid = "round-%d" % round_number
@@ -1112,10 +1327,14 @@ class ConcurrencyTests(WithTemp):
             self.assertEqual(self.finish(mode), (0, {"result": None}, ""))
             self.assertEqual(self.finish(auth), (0, {"result": None}, ""))
             old = [authorization("old")] if round_number == 2 else []
-            processed = ["old", "e1"] if round_number == 2 else ["e1"]
-            self.assertEqual(self.read("claude", sid), ("valid", state_of(
+            processed = ["old", "e1", "m1"] if round_number == 2 else ["e1", "m1"]
+            kind, got = self.read("claude", sid)
+            self.assertEqual(kind, "valid")
+            self.assertEqual(sorted(got["processed_events"]), sorted(processed))  # the order is a race
+            got["processed_events"] = processed
+            self.assertEqual(got, state_of(
                 sid=sid, mode="each", mode_event={"id": "m1", "at": AT2}, authorizations=old + [authorization("e1")],
-                processed=processed)))
+                processed=processed))
             self.only_state_and_lock("claude", sid)
             rs.clear("claude", sid, self.base)
 
@@ -1210,7 +1429,7 @@ class ConcurrencyTests(WithTemp):
                 self.assert_unchanged(earlier)
                 self.assertEqual(self.read(), ("valid", state_of(
                     mode="off", mode_event={"id": "m1", "at": AT}, authorizations=[authorization("e1")],
-                    processed=["e1"])))
+                    processed=["m1", "e1"])))
                 self.only_state_and_lock()
         # the failed consume did not lose the authorization, and the next call works
         self.assertEqual(self.consume(), authorization("e1"))
@@ -1227,7 +1446,7 @@ class ConcurrencyTests(WithTemp):
         self.authorize("e1")
         earlier = snapshot(self.base)
         expected = state_of(mode="off", mode_event={"id": "m1", "at": AT}, authorizations=[authorization("e1")],
-                            processed=["e1"])
+                            processed=["m1", "e1"])
         crashes = (("rename", 7), ("write", 8))
         for crash, code in crashes:
             proc = self.spawn("set_mode", "claude", SID, "each", "m2", AT2, base=self.base, crash=crash)
@@ -1246,7 +1465,7 @@ class ConcurrencyTests(WithTemp):
         self.set_mode("gate", "m3", AT2)
         self.assertEqual(self.read(), ("valid", state_of(
             mode="gate", mode_event={"id": "m3", "at": AT2}, authorizations=[authorization("e1")],
-            processed=["e1"])))
+            processed=["m1", "e1", "m3"])))
         self.assertEqual(len([n for n in os.listdir(self.base) if n.startswith(".tmp-")]), 2)
 
     def test_a_crash_before_any_state_exists_leaves_no_state_and_a_temporary_file(self):

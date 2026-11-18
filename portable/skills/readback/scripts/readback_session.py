@@ -262,17 +262,18 @@ def read(host, session_id, base=None):
 
 
 def set_mode(host, session_id, mode, event_id, at, base=None):
-    """Write the mode and mode_event. The same event id as mode_event changes nothing."""
+    """Write the mode and mode_event, and remember the event id. An event id that processed_events holds changes nothing."""
     folder, state_name, lock_name = _names(host, session_id, base)
     if mode not in MODES:
         raise ValueError("mode")
     _need_event(event_id, at)
     with _locked(folder, lock_name):
         state = _writable(folder, state_name, host, session_id)
-        if state["mode_event"] is not None and state["mode_event"]["id"] == event_id:
+        if event_id in state["processed_events"]:
             return
         state["mode"] = mode
         state["mode_event"] = {"id": event_id, "at": at}
+        state["processed_events"].append(event_id)
         _publish(folder, state_name, state)
 
 
