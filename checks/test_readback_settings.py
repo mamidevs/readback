@@ -1467,7 +1467,7 @@ class CommandTests(Guarded):
         self.assertEqual(got["worktree_root"], str(tree))
         self.assertEqual(got["git_common_dir"], str(w.legacy_repo / ".git"))
         self.assertEqual(got["repository"], str(w.legacy_repo / ".git"))
-        self.assertEqual(got["home"], str(w.logbook / "legacy-wt"))
+        self.assertEqual(got["home"], str(w.legacy_home))  # the home of the main worktree (P1a)
 
     def test_resolve_defaults_come_from_the_home_of_the_user(self):
         w = self.w
