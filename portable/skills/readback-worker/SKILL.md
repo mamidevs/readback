@@ -37,6 +37,11 @@ Without a contract, write `done when:` in plain words and `contract: none`.
 
 ## When you stop
 
+For a code step, submit the local commit and the evidence for that revision.
+Cite the trusted run of the named checks for that commit. Mark pending checks UNVERIFIED and report PARTIAL.
+When the results arrive, update the handoff from that run.
+You may start another assigned, independent task immediately after handoff. Dependent work uses the accepted revision.
+
 The handoff has these keys in this order. Use JSON with the same keys when a script checks it.
 
 | Key | Content |

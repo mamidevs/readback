@@ -124,7 +124,7 @@ READBACK  task: <what I will do> | limits: <what I must not change> | done when:
 
 The readback has two forms.
 
-- Recorded readback. The worker writes the readback in the `readback` key of the handoff. The lead compares it with the contract before it accepts the work. This form finds a wrong start after the work.
+- Recorded readback. The worker writes the readback in the `readback` key of the handoff. The lead reviews a mismatch between the readback and the contract.
 - Confirmed readback. The lead asks for the readback only. The worker returns the readback and changes no file. The lead corrects it, then starts the work. This form stops a wrong start.
 
 The recorded readback is the default. Use the confirmed readback when a wrong start is hard to undo.
@@ -235,9 +235,23 @@ A handoff that reports FAILED or UNVERIFIED with evidence can get PASS.
 The lead accepts work by these rules.
 
 Accept only a DONE handoff whose contract statements are all VERIFIED.
-In mode off, acceptance rests on the contract's named checks and the lead's reading.
-In mode gate, the acceptance of a step also needs a claim check.
-A claim check breaks the claimed behaviour on a copy and shows that the named check fails.
+For a code step, assign one worker a bounded outcome and name its checks before work starts.
+The worker may start other assigned, independent work as soon as it submits the handoff.
+Dependent work uses the accepted revision.
+
+Use one trusted run of the contract's named checks for the submitted commit.
+Use a lead-controlled script or project CI on a clean checkout with fresh HOME and TMPDIR.
+Take commands from the agreed contract. Keep the commit, commands, exit codes and output hashes with the retained outputs.
+Worker and lead may cite that same run. A changed revision needs fresh evidence.
+
+For code steps in off or gate mode, use the trusted result without a second manual run.
+For an observation without a commit, the lead reviews the named evidence.
+Accept a routine step when structural validation is true, the join is conflict-free and the integration suite passes on the joined revision.
+Escalate a failed or missing check, ambiguous scope or evidence, a denied action, a conflict or a high-risk change to the lead.
+High-risk changes include hooks, modules shared with hooks or the judge helper, process supervision, external writes, and application trust boundaries.
+Changes that weaken an agreed check also need lead review. When a trusted run is unavailable, keep acceptance open.
+Reserve mutation tests for a named contract check or a specific doubt about what a test detects.
+At the end of the part, check the integrated user behaviour against the owner's request.
 In mode each, the outside judge screens each step; a step PASS accepts nothing, and a step FAIL sends the work back.
 An acceptance without a judge needs structural validation true.
 In the modes gate and each, the acceptance of a part needs a gate PASS.
@@ -246,7 +260,7 @@ JUDGE off and JUDGE skipped are not PASS.
 
 After a FAIL, the lead sends the work back or tells the owner what failed.
 If the state is not DONE, the lead tells the owner what remains.
-Before the lead accepts, it reads the owner's request again. If the contract missed a part of the request, the lead tells the owner.
+Before the lead accepts the part, it reads the owner's request again. If the contract missed a part of the request, the lead tells the owner.
 
 The lead adds two lines below the stored handoff. It does not change the worker's text.
 

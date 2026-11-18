@@ -80,9 +80,11 @@ LIMITS = (
 # D7: PROTOCOL.md and output-styles/readback.md
 ACCEPT_SENTENCES = (
     "Accept only a DONE handoff whose contract statements are all VERIFIED.",
-    "In mode off, acceptance rests on the contract's named checks and the lead's reading.",
-    "In mode gate, the acceptance of a step also needs a claim check.",
-    "A claim check breaks the claimed behaviour on a copy and shows that the named check fails.",
+    "The worker may start other assigned, independent work as soon as it submits the handoff.",
+    "Use one trusted run of the contract's named checks for the submitted commit.",
+    "Accept a routine step when structural validation is true, the join is conflict-free and the integration suite passes on the joined revision.",
+    "Escalate a failed or missing check, ambiguous scope or evidence, a denied action, a conflict or a high-risk change to the lead.",
+    "At the end of the part, check the integrated user behaviour against the owner's request.",
     "In mode each, the outside judge screens each step; a step PASS accepts nothing, and a step FAIL sends the work back.",
     "An acceptance without a judge needs structural validation true.",
     "In the modes gate and each, the acceptance of a part needs a gate PASS.",
