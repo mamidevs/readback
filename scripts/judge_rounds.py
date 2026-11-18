@@ -307,16 +307,24 @@ def finish(reservation, result):
 
 # ------------------------------------------------------------------ bounded run (D8)
 
-def start_reaper(pgid, seconds):
-    """Start the watchdog of the provider's process group; it survives a SIGKILL of the helper."""
-    return subprocess.Popen(
-        [sys.executable, "-B", os.path.abspath(__file__), "reap", str(pgid), repr(time.time() + seconds + REAP_AFTER)],
-        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+def start_reaper(seconds):
+    """Start the watchdog before the provider. Return (process, write end of its pipe).
 
-
-def stop_reaper(process):
-    process.kill()
-    process.wait()
+    The provider's child process writes its pid to the pipe before exec; the pipe then closes. The watchdog
+    reads the group id, and ends the group `seconds` + REAP_AFTER after that, or earlier when the group is gone.
+    It survives a SIGKILL of the helper and ends at once when the pipe closes without a pid.
+    """
+    read, write = os.pipe()
+    try:
+        process = subprocess.Popen(
+            [sys.executable, "-B", os.path.abspath(__file__), "reap", repr(seconds + REAP_AFTER)],
+            stdin=read, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    except BaseException:
+        os.close(write)
+        raise
+    finally:
+        os.close(read)
+    return process, write
 
 
 def reap(pgid, kill_at):
@@ -333,4 +341,5 @@ def reap(pgid, kill_at):
 
 
 if __name__ == "__main__":
-    reap(int(sys.argv[2]), float(sys.argv[3]))
+    text = sys.stdin.read().strip()
+    reap(int(text) if text.isdigit() else 0, time.time() + float(sys.argv[2]))

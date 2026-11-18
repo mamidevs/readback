@@ -756,7 +756,8 @@ prompt = sys.stdin.buffer.read()
 with open(os.environ["FAKE_RECORD"], "a") as record:
     record.write(json.dumps({"provider": "codex", "pid": os.getpid()}) + "\n")
 if os.environ.get("FAKE_PIDS"):
-    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"])
+    quiet = {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL} if os.environ.get("FAKE_DESC") else {}
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"], **quiet)
     pathlib.Path(os.environ["FAKE_PIDS"]).write_text("%d %d %r" % (os.getpid(), child.pid, time.time()))
 go = os.environ.get("FAKE_GO")
 while go and not os.path.exists(go):
@@ -775,6 +776,30 @@ def stall(reservation):
     open(os.environ["DRIVER_MARK"], "w").write("reserved")
     time.sleep(600)
 judge_rounds.confirm = stall
+sys.exit(outside_judge.main(sys.argv[2:]))
+'''
+
+
+DRIVER_KILL = '''
+import os, signal, subprocess, sys
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[1])
+import outside_judge
+active, count, real, run = [False], [0], subprocess.Popen, outside_judge.run_process
+class Spy(real):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if active[0]:
+            with open(os.environ["DRIVER_PIDS"], "a") as handle:
+                handle.write("%d\\n" % self.pid)
+            count[0] += 1
+            if count[0] == int(os.environ["KILL_AFTER"]):
+                os.kill(os.getpid(), signal.SIGKILL)
+def wrapped(*args):
+    active[0] = True
+    return run(*args)
+subprocess.Popen = Spy
+outside_judge.run_process = wrapped
 sys.exit(outside_judge.main(sys.argv[2:]))
 '''
 
@@ -899,10 +924,11 @@ class RaceTests(Rounds):
         seen = []
         real = judge_rounds.start_reaper
 
-        def recording(pgid, limit):
-            seen.append(real(pgid, limit))
-            self.procs.append(seen[0])
-            return seen[0]
+        def recording(limit):
+            found = real(limit)
+            seen.append(found[0])
+            self.procs.append(found[0])
+            return found
         with mock.patch.object(judge_rounds, "start_reaper", recording):
             try:
                 outcome = outside_judge.run_process(command, "prompt", str(self.repo), dict(os.environ), seconds)
@@ -913,7 +939,7 @@ class RaceTests(Rounds):
     def test_x07_the_watchdog_ends_with_the_run_and_the_output_is_unchanged(self):
         outcome, seen = self.bounded([sys.executable, "-c", "import sys; print(sys.stdin.read() + '!')"], 10)
         self.assertEqual(outcome, "prompt!\n")
-        self.assertIsNotNone(seen[0].poll())
+        self.assertTrue(self.wait_for(lambda: seen[0].poll() is not None, 5))  # it ends by itself: the group is gone
         self.assertEqual(len(seen), 1)
 
     def test_x07_a_deadline_stops_the_group_and_the_watchdog(self):
@@ -923,23 +949,85 @@ class RaceTests(Rounds):
         self.pids.append(int(pidfile.read_text()))
         self.assertIsInstance(outcome, outside_judge.JudgeError)
         self.assertEqual(str(outcome), "the judge exceeded the deadline")
-        self.assertIsNotNone(seen[0].poll())
+        self.assertTrue(self.wait_for(lambda: seen[0].poll() is not None, 5))
         with self.assertRaises(ProcessLookupError):
             os.kill(int(pidfile.read_text()), 0)
 
-    def test_x07_a_watchdog_that_cannot_start_stops_the_provider_and_fails(self):
+    def test_x07_a_watchdog_that_cannot_start_means_no_provider(self):
         pidfile = self.base / "pid"
         code = "import os, time; open(%r, 'w').write(str(os.getpid())); time.sleep(60)" % str(pidfile)
 
-        def cannot(pgid, limit):
-            self.assertTrue(self.wait_for(pidfile.exists, 10))
+        def cannot(limit):
             raise OSError("no process")
         with mock.patch.object(judge_rounds, "start_reaper", cannot):
             with self.assertRaises(outside_judge.JudgeError) as raised:
                 outside_judge.run_process([sys.executable, "-c", code], "", str(self.repo), dict(os.environ), 30)
         self.assertEqual(str(raised.exception), "could not start the judge command")
-        self.pids.append(int(pidfile.read_text()))
-        self.assertTrue(self.wait_for(lambda: not self.alive(int(pidfile.read_text())), 5))
+        time.sleep(1)
+        self.assertFalse(pidfile.exists())
+
+    def run_driver(self, kill_after, env):
+        """The helper with a Popen wrapper: SIGKILL to itself right after the nth start that run_process makes."""
+        pids = self.base / "driver-pids"
+        row = dict(env, KILL_AFTER=str(kill_after), DRIVER_PIDS=str(pids))
+        process = self.spawn(row, [sys.executable, "-B", "-c", DRIVER_KILL, str(base.SCRIPTS), "--host", "claude",
+                                   "--tier", "gate", str(self.contract), str(self.handoff), str(self.repo)])
+        return process, pids
+
+    def started_pids(self, pids):
+        found = [int(x) for x in pids.read_text().split()] if pids.exists() else []
+        self.pids.extend(found)
+        return found
+
+    def test_x10_a_helper_killed_after_the_start_of_the_watchdog_leaves_no_provider_and_no_watchdog(self):
+        process, pids = self.run_driver(1, {"FAKE_PIDS": str(self.base / "pids"), "FAKE_HANG": "1",
+                                            "READBACK_JUDGE_SECONDS": "2"})
+        process.wait(timeout=60)
+        self.assertEqual(process.returncode, -signal.SIGKILL)
+        found = self.started_pids(pids)
+        self.assertEqual(len(found), 1)  # only the watchdog
+        self.assertTrue(self.wait_for(lambda: not self.alive(found[0]), 5), "the watchdog is alive")
+        time.sleep(1)
+        self.assertEqual(self.provider_calls(), 0)
+        self.assertEqual([(a["result"], a["ended_by"]) for a in self.ledger()["attempts"]], [(None, None)])
+
+    def test_x10_a_helper_killed_directly_after_the_start_of_the_provider_leaves_nothing_alive(self):
+        pidfile = self.base / "pids"
+        process, pids = self.run_driver(2, {"FAKE_PIDS": str(pidfile), "FAKE_HANG": "1", "READBACK_JUDGE_SECONDS": "2"})
+        process.wait(timeout=60)
+        self.assertEqual(process.returncode, -signal.SIGKILL)
+        self.assertTrue(self.wait_for(lambda: pidfile.exists() and len(pidfile.read_text().split()) == 3), "no provider")
+        fields = pidfile.read_text().split()
+        provider, child, began = int(fields[0]), int(fields[1]), float(fields[2])
+        self.pids.extend([provider, child])
+        found = self.started_pids(pids)
+        self.assertEqual(len(found), 2)  # the watchdog and the provider
+        self.assertTrue(self.wait_for(lambda: all(not self.alive(p) for p in [provider, child] + found), 7))
+        self.assertLess(time.time() - began, 7)
+        self.assertEqual([(a["result"], a["ended_by"]) for a in self.ledger()["attempts"]], [(None, None)])
+
+    def test_x11_a_descendant_after_a_normal_exit_is_ended_at_the_bound_and_the_watchdog_ends_after_it(self):
+        pidfile = self.base / "pids"
+        process, pids = self.run_driver(0, {"FAKE_PIDS": str(pidfile), "FAKE_DESC": "1", "READBACK_JUDGE_SECONDS": "2"})
+        out, _err = process.communicate(timeout=30)  # the helper does not wait for the child
+        self.assertEqual(process.returncode, 0, out)
+        self.assertTrue(out.decode().startswith("JUDGE      PASS"), out)
+        fields = pidfile.read_text().split()
+        provider, child, began = int(fields[0]), int(fields[1]), float(fields[2])
+        self.pids.extend([provider, child])
+        self.assertEqual([(a["result"], a["ended_by"]) for a in self.ledger()["attempts"]], [("PASS", "helper")])
+        self.assertTrue(self.alive(child) or time.time() - began > 1)
+        self.assertTrue(self.wait_for(lambda: not self.alive(child), 7))
+        self.assertLess(time.time() - began, 7)
+        watchdog = self.started_pids(pids)[0]
+        self.assertTrue(self.wait_for(lambda: not self.alive(watchdog), 5), "the watchdog is alive")
+
+    def test_x12_a_normal_run_leaves_no_watchdog_behind(self):
+        process, pids = self.run_driver(0, {})
+        out, _err = process.communicate(timeout=60)
+        self.assertEqual(process.returncode, 0, out)
+        watchdog = self.started_pids(pids)[0]
+        self.assertTrue(self.wait_for(lambda: not self.alive(watchdog), 5), "the watchdog is alive")
 
     def test_x09_the_watchdog_kills_the_group_only_at_its_time_and_never_a_group_below_2(self):
         for pgid in (1, 0, -4):

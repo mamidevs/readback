@@ -292,23 +292,22 @@ def stop_group(process):
 
 
 def run_process(command, prompt, repo, env, seconds):
-    """Run the provider in its own process group. A watchdog ends the group also when the helper is killed."""
+    """Run the provider in its own process group. A watchdog that starts first bounds the group, also after a SIGKILL of the helper."""
+    try:
+        watchdog, mark = judge_rounds.start_reaper(seconds)
+    except Exception as exc:
+        raise JudgeError("could not start the judge command") from exc
     try:
         process = subprocess.Popen(
             command, cwd=repo, env=env, stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
             encoding="utf-8", errors="replace", start_new_session=True,
+            preexec_fn=lambda: os.write(mark, str(os.getpid()).encode()),  # the watchdog learns the group before exec
         )
     except OSError as exc:
         raise JudgeError("could not start the judge command") from exc
-    try:
-        watchdog = judge_rounds.start_reaper(process.pid, seconds)
-    except Exception as exc:
-        stop_group(process)
-        raise JudgeError("could not start the judge command") from exc
-    except BaseException:
-        stop_group(process)
-        raise
+    finally:
+        os.close(mark)
     try:
         stdout, _stderr = process.communicate(prompt, timeout=seconds)
     except subprocess.TimeoutExpired as exc:
@@ -317,8 +316,6 @@ def run_process(command, prompt, repo, env, seconds):
     except BaseException:
         stop_group(process)
         raise
-    finally:
-        judge_rounds.stop_reaper(watchdog)
     if process.returncode != 0:
         raise JudgeError("the judge command ended with code " + str(process.returncode))
     return stdout
