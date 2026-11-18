@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -1789,6 +1790,55 @@ class CommandTests(Guarded):
 
 
 # =====================================================================
+class BytecodeTests(Guarded):
+    """The command leaves no bytecode beside its scripts, in the source layout and in the portable one."""
+
+    NAMES = ("readback_settings.py", "outside_judge.py", "project_registry.py", "review_capture.py",
+             "review_receipt.py", "validate_handoff.py")
+    LAYOUTS = (("source", SCRIPTS), ("portable", ROOT / "portable" / "skills" / "readback" / "scripts"))
+
+    def copy_of(self, source):
+        folder = tempfile.TemporaryDirectory(prefix="readback-settings-bytecode-")
+        self.addCleanup(folder.cleanup)
+        base = Path(folder.name).resolve()
+        (base / "scripts").mkdir()
+        (base / "work").mkdir()
+        for name in self.NAMES:
+            shutil.copyfile(source / name, base / "scripts" / name)
+        return base
+
+    @staticmethod
+    def bytecode_below(folder):
+        return sorted(p.relative_to(folder).as_posix() for p in folder.rglob("*")
+                      if p.name == "__pycache__" or p.suffix == ".pyc")
+
+    def environment(self):
+        env = {"PATH": os.environ.get("PATH", ""), "HOME": str(self.safe_home), "LANG": "C.UTF-8"}
+        for name in ("PYTHONDONTWRITEBYTECODE", "PYTHONPYCACHEPREFIX"):
+            self.assertNotIn(name, env)
+        return env
+
+    def test_show_writes_no_bytecode_in_either_layout(self):
+        for label, source in self.LAYOUTS:
+            with self.subTest(layout=label):
+                base = self.copy_of(source)
+                proc = subprocess.run(
+                    [sys.executable, str(base / "scripts" / "readback_settings.py"), "--host", "claude",
+                     "--registry", str(base / "work" / "none.json"), "--logbook", str(base / "work" / "logbook"),
+                     "show"],
+                    cwd=str(base / "work"), env=self.environment(), capture_output=True, timeout=30)
+                self.assertEqual(proc.stderr, b"")
+                self.assertEqual(proc.returncode, 0)
+                self.assertEqual(json.loads(proc.stdout)["status"], "LEGACY_FALLBACK")
+                self.assertEqual(self.bytecode_below(base), [])
+
+    def test_the_check_can_fail_when_bytecode_is_written(self):
+        base = self.copy_of(SCRIPTS)
+        subprocess.run([sys.executable, "-c", "import project_registry"], cwd=str(base / "scripts"),
+                       env=self.environment(), capture_output=True, timeout=30, check=True)
+        self.assertEqual(len(self.bytecode_below(base)), 2)  # the folder and one .pyc file
+
+
 class Unsupported(Exception):
     pass
 

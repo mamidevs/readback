@@ -18,8 +18,9 @@ import re
 import sys
 import tempfile
 
-import outside_judge
-import project_registry
+sys.dont_write_bytecode = True  # the sibling imports below must leave no .pyc file next to the command
+import outside_judge  # noqa: E402
+import project_registry  # noqa: E402
 
 _MODEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]*")
 _EFFORT = re.compile(r"[A-Za-z0-9_-]+")
