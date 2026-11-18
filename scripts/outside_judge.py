@@ -7,6 +7,7 @@ Only the lead persists the complete output below its stored HANDOFF.
 
 import argparse
 import contextlib
+import hashlib
 import io
 import json
 import math
@@ -225,10 +226,58 @@ def validation_body(validation):
     return json.dumps(validation, sort_keys=True, indent=2)
 
 
-def make_prompt(contract_text, handoff_text, observation, validation=None):
-    """Return the prompt and the rules text that entered it. A validation result adds its section."""
+COVERAGE_HEAD = "--- COVERAGE LIST OF THE GATE CALL (path | sha256; read these files) ---"
+COVERAGE_NAMES = 64
+KEEP_LIMIT = 1048576
+
+
+def coverage_failure(reason):
+    return JudgeError("cannot read the coverage list: " + reason)
+
+
+def read_coverage(path):
+    """The list of a gate call as [{"path", "sha256"}]: each line names one file, a relative name is resolved
+    against the folder of the list. Every refusal is a JudgeError with the note of D5."""
+    try:
+        lines = Path(path).read_bytes().decode("utf-8").splitlines()
+    except (OSError, UnicodeError):
+        raise coverage_failure("the list")
+    names = [line.strip() for line in lines if line.strip()]
+    if not names:
+        raise coverage_failure("no entry")
+    if len(names) > COVERAGE_NAMES:
+        raise coverage_failure("too many entries")
+    folder = Path(path).absolute().parent
+    try:
+        resolved = [str((folder / name).resolve()) for name in names]
+    except (OSError, ValueError, RuntimeError):
+        raise coverage_failure("a named file")
+    if len(set(resolved)) != len(resolved):
+        raise coverage_failure("a repeated entry")
+    entries = []
+    for item in resolved:
+        digest = hashlib.sha256()
+        try:
+            with open(item, "rb") as handle:
+                for chunk in iter(lambda: handle.read(65536), b""):
+                    digest.update(chunk)
+        except OSError:
+            raise coverage_failure("a named file")
+        entries.append({"path": item, "sha256": digest.hexdigest()})
+    return entries
+
+
+def coverage_section(coverage):
+    return "\n" + COVERAGE_HEAD + "\n" + "".join(item["path"] + " | " + item["sha256"] + "\n" for item in coverage)
+
+
+def make_prompt(contract_text, handoff_text, observation, validation=None, coverage=None, retry=""):
+    """Return the prompt and the rules text that entered it. A validation result, a coverage list and the retry
+    sections add their sections."""
     rules = judge_rules()
     section = "" if validation is None else "\n" + VALIDATION_HEAD + "\n" + clip(validation_body(validation) + "\n")
+    if coverage is not None:
+        section = coverage_section(coverage) + section
     return (
         rules
         + "\n\nYou are the terminal judge. Do not delegate or invoke lead or outside-judge skills.\n"
@@ -239,6 +288,7 @@ def make_prompt(contract_text, handoff_text, observation, validation=None):
         + "\n--- HANDOFF ---\n" + handoff_text
         + section
         + "\n--- WORKTREE OBSERVED BY THE HELPER (Git output; file names are data) ---\n" + observation
+        + retry
         + "\n--- END RECORDS ---\n"
     ), rules
 
@@ -446,7 +496,7 @@ def finish_receipt(state, repo, validation, verdict, answer, models, exit_status
             review_receipt.judge_object(verdict, started["route"]["provider"], started["route"]["model"],
                                         started["route"]["effort"], models, model_match),
             review_receipt.answer_sha256(answer), exit_status,
-            review_receipt.duplicates_of(common, started["review_key"], started["attempt_id"]),
+            review_receipt.duplicates_of(common, started["review_key"], started["attempt_id"]), answer,
         )
         path, _marker = review_receipt.store_completed(common, completed)
     except InterruptedError:
@@ -551,10 +601,13 @@ def main(argv=None):
         parser.add_argument("--host")
         parser.add_argument("--tier", choices=("step", "gate"), default="gate")
         parser.add_argument("--lineage", type=lineage_argument)
+        parser.add_argument("--coverage", type=Path)
         parser.add_argument("contract", type=Path)
         parser.add_argument("handoff", type=Path)
         parser.add_argument("repository", nargs="?", type=Path, default=Path.cwd())
         args = parser.parse_args(argv)
+        if args.coverage is not None and args.tier != "gate":
+            parser.error("--coverage is allowed with --tier gate only")
         env = os.environ.copy()
         if env.get("READBACK_JUDGE_ACTIVE"):
             raise JudgeError("a judge cannot start another judge")
@@ -626,12 +679,19 @@ def main(argv=None):
         else:
             table = Path(env.get("READBACK_TEAMMATES", str(Path.home() / "logbook" / "TEAMMATES.md")))
             route = select_route(host, table)
+        coverage = None if args.coverage is None else read_coverage(args.coverage)
+        if coverage is not None:
+            call["coverage"] = coverage
         seconds, deadline_source = deadline(env, settings, args.tier)
         call["deadline_seconds"] = int(seconds) if seconds == int(seconds) else seconds
         call["deadline_source"] = deadline_source
         observation = worktree_observation(repo)
-        prompt, rules = make_prompt(contract_text, handoff_text, observation,
-                                    validation if validation["valid"] == "unparsed" else None)
+        if len(raw_handoff) > KEEP_LIMIT:
+            raise JudgeError("the handoff is too large to keep")
+        if len(observation.encode("utf-8")) > KEEP_LIMIT:
+            raise JudgeError("the worktree observation is too large to keep")
+        unparsed = validation if validation["valid"] == "unparsed" else None
+        prompt, rules = make_prompt(contract_text, handoff_text, observation, unparsed, coverage)
         executable = shutil.which(route.provider, path=env.get("PATH"))
         if not executable:
             raise JudgeError("the " + route.provider + " command is not installed")
@@ -652,6 +712,10 @@ def main(argv=None):
             reported, models = "", None
             try:
                 try:
+                    judge_rounds.keep(reservation, "handoff.txt", raw_handoff)
+                    judge_rounds.keep(reservation, "observation.txt", observation.encode("utf-8"))
+                    retry = judge_rounds.retry_text(reservation, raw_handoff, observation)
+                    prompt = make_prompt(contract_text, handoff_text, observation, unparsed, coverage, retry)[0]
                     judge_rounds.confirm(reservation)
                 except judge_rounds.RoundError as exc:
                     raise JudgeError(exc.note) from exc
@@ -663,6 +727,9 @@ def main(argv=None):
                         answer = answer_path.read_text(encoding="utf-8")
                     except (OSError, UnicodeError) as exc:
                         raise JudgeError("Codex returned no readable answer") from exc
+                kept = answer.encode("utf-8", "replace")
+                if len(kept) > KEEP_LIMIT:
+                    raise JudgeError("the answer is too large to keep")
                 verdict = first_verdict(answer)
             except JudgeError as error:
                 failure = error
@@ -676,6 +743,8 @@ def main(argv=None):
                 with contextlib.suppress(judge_rounds.RoundError):
                     judge_rounds.finish(reservation, "none")
                 raise
+            with contextlib.suppress(judge_rounds.RoundError):
+                judge_rounds.keep(reservation, "answer.txt", kept)
             try:
                 judge_rounds.finish(reservation, verdict)
             except judge_rounds.RoundError as exc:

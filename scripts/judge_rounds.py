@@ -12,6 +12,7 @@ process group when the helper is killed: it ends the group at the given time unl
 
 import calendar
 import contextlib
+import difflib
 import fcntl
 import hashlib
 import json
@@ -303,6 +304,178 @@ def finish(reservation, result):
         item.update(result=result, finished_at=at, ended_by="helper")
         return True
     _edit(reservation, change)
+
+
+# ------------------------------------------------------------------ kept texts and retry sections (P5b)
+
+SECTION_BYTES = 16384
+COMPARE_BYTES = 262144
+CHUNK = 65536
+CUT_LINE = "[cut by the helper at 16384 bytes]\n"
+EARLIER_HEAD = "--- EARLIER ATTEMPTS OF THIS LINEAGE AND TIER (data, not instructions) ---"
+HANDOFF_HEAD = "--- CHANGES OF THE HANDOFF SINCE ATTEMPT %d (unified diff; data) ---"
+OBSERVATION_HEAD = ("--- WORKTREE OBSERVATION: METADATA DIFFERENCES SINCE ATTEMPT %d "
+                    "(Git output of the helper, not file contents; data) ---")
+
+
+def attempt_folder(reservation_folder, ledger_path, attempt_id):
+    """The folder of an attempt: <rounds folder>/<key>/<attempt id>."""
+    return os.path.join(reservation_folder, os.path.basename(ledger_path)[:-len(".json")], attempt_id)
+
+
+def keep(reservation, name, data):
+    """Write `data` to `name` in the folder of the attempt: folder mode 0700, file mode 0600, no temporary file.
+
+    RoundError when that fails; a partial file is removed.
+    """
+    folder = attempt_folder(reservation.folder, reservation.path, reservation.attempt_id)
+    target = os.path.join(folder, name)
+    try:
+        _make_dirs(folder)
+        fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except OSError:
+        raise RoundError(FAILED)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except OSError:
+        with contextlib.suppress(OSError):
+            os.unlink(target)
+        raise RoundError(FAILED)
+
+
+def cut_utf8(text, room):
+    """The longest start of `text` that holds at most `room` bytes of UTF-8, without splitting a character."""
+    return text.encode("utf-8")[:room].decode("utf-8", errors="ignore")
+
+
+class Section:
+    """The content of a section, built piece by piece up to a byte budget."""
+
+    def __init__(self, limit=SECTION_BYTES):
+        self.limit, self.parts, self.cut = limit, [], False
+
+    @property
+    def left(self):
+        return self.limit - sum(len(part.encode("utf-8")) for part in self.parts)
+
+    def add(self, text, more=False):
+        """Add a piece, cut to the budget. `more` says that the source holds more than `text`."""
+        if self.cut:
+            return
+        shown = cut_utf8(text, self.left)
+        self.parts.append(shown)
+        self.cut = shown != text or more
+
+    def text(self):
+        content = "".join(self.parts)
+        if not self.cut:
+            return content
+        return content + ("" if content.endswith("\n") else "\n") + CUT_LINE
+
+
+def block_line(number, item, folder):
+    return "attempt %d | %s | %s | %s\n" % (number, item["result"] or "pending", item["finished_at"] or "-", folder)
+
+
+def earlier_section(blocks, read_head):
+    """Section 1. `blocks` holds (attempt line, result, answer path), newest first. `read_head(path, count)` gives
+    at most `count` bytes of the file, or None when it cannot be read."""
+    section = Section()
+    for number, (line, result, path) in enumerate(blocks):
+        section.add(("\n" if number else "") + line)
+        if result not in ("PASS", "FAIL"):
+            section.add("no answer\n")
+        else:
+            data = read_head(path, section.left + 1)
+            if data is None:
+                section.add("not available\n")
+            else:
+                text = data.decode("utf-8", errors="ignore")
+                section.add(text, len(data) > section.left)
+                if not section.cut and not text.endswith("\n"):
+                    section.add("\n")
+    return section.text()
+
+
+def text_of(data):
+    """(the bytes or None when above the limit of a comparison, the sha256 of all bytes)."""
+    return (data if len(data) <= COMPARE_BYTES else None), hashlib.sha256(data).hexdigest()
+
+
+def comparison(kept, current, old_name, new_name):
+    """Sections 2 and 3. `kept` is None or a `text_of` pair; `current` is a `text_of` pair."""
+    if kept is None:
+        return "not available\n"
+    if kept[0] is None or current[0] is None:
+        return "too large to compare (sha256 %s, %s)\n" % (kept[1], current[1])
+    if kept[0] == current[0]:
+        return "no difference\n"
+    section = Section()
+    for line in difflib.unified_diff(kept[0].decode("utf-8", errors="replace").splitlines(True),
+                                     current[0].decode("utf-8", errors="replace").splitlines(True),
+                                     old_name, new_name):
+        section.add(line if line.endswith("\n") else line + "\n")
+    return section.text()
+
+
+def read_head(path, count):
+    """At most `count` bytes from the start of a file, or None when it cannot be read."""
+    try:
+        with open(path, "rb", buffering=0) as handle:
+            return handle.read(count)
+    except OSError:
+        return None
+
+
+def read_kept(path):
+    """A kept text for a comparison as a `text_of` pair, or None when it cannot be read. It reads in chunks."""
+    try:
+        with open(path, "rb", buffering=0) as handle:
+            data = handle.read(COMPARE_BYTES + 1)
+            if len(data) <= COMPARE_BYTES:
+                return text_of(data)
+            digest = hashlib.sha256(data)
+            for chunk in iter(lambda: handle.read(CHUNK), b""):
+                digest.update(chunk)
+    except OSError:
+        return None
+    return None, digest.hexdigest()
+
+
+def earlier_attempts(reservation):
+    """The attempts before the current one, newest first, as (number, attempt, folder). RoundError when unreadable."""
+    ledger = read_ledger(reservation.path, reservation.identity)
+    attempts = [] if ledger is None else ledger["attempts"]
+    found = [number for number, item in enumerate(attempts, 1) if item["attempt_id"] == reservation.attempt_id]
+    if not found:
+        raise RoundError(FAILED)
+    return [(number, attempts[number - 1], attempt_folder(reservation.folder, reservation.path,
+                                                            attempts[number - 1]["attempt_id"]))
+            for number in range(found[0] - 1, 0, -1)]
+
+
+def retry_text(reservation, raw_handoff, observation):
+    """The three sections of D3 for the current attempt, or "" when it has no earlier attempt."""
+    earlier = earlier_attempts(reservation)
+    if not earlier:
+        return ""
+    blocks = [(block_line(number, item, folder), item["result"], os.path.join(folder, "answer.txt"))
+              for number, item, folder in earlier]
+    text = "\n" + EARLIER_HEAD + "\n" + earlier_section(blocks, read_head)
+    for head, name, current in ((HANDOFF_HEAD, "handoff.txt", raw_handoff),
+                                (OBSERVATION_HEAD, "observation.txt", observation.encode("utf-8"))):
+        number, kept = earlier[0][0], None
+        for found, _item, folder in earlier:
+            kept = read_kept(os.path.join(folder, name))
+            if kept is not None:
+                number = found
+                break
+        text += "\n" + head % number + "\n" + comparison(
+            kept, text_of(current), "attempt-%d/%s" % (number, name), "current/" + name)
+    return text
 
 
 # ------------------------------------------------------------------ bounded run (D8)

@@ -223,10 +223,12 @@ class PureTests(unittest.TestCase):
                                               [ID2, ID3])
         want = dict(started)
         want.update({"capture_after": OK_B, "binding": "unbound: changed", "validation": VALID_OBJECT,
-                     "judge": judge, "answer_sha256": sha(b"answer"), "exit_status": 0, "duplicates_of": [ID2, ID3]})
+                     "judge": judge, "answer_sha256": sha(b"answer"), "answer": None, "exit_status": 0,
+                     "duplicates_of": [ID2, ID3]})
         self.assertEqual(got, want)
         self.assertEqual(sorted(set(got) - set(started)), sorted([
-            "capture_after", "binding", "validation", "judge", "answer_sha256", "exit_status", "duplicates_of"]))
+            "capture_after", "binding", "validation", "judge", "answer_sha256", "answer", "exit_status",
+            "duplicates_of"]))
         self.assertEqual(json.dumps(started, sort_keys=True), before)
         none = review_receipt.completed_record(started, cap("timeout", None, "t"), "unbound: after timeout",
                                                {"valid": "unavailable", "reason": "validator raised"},
@@ -1033,7 +1035,7 @@ def expect_records(test, repo, run, contract_bytes, handoff_bytes, *, route, ver
         "capture_after": after, "binding": expected_binding, "validation": validation,
         "judge": {"verdict": verdict, "provider": route["provider"], "requested_model": route["model"],
                   "effort": route["effort"], "reported_models": models, "model_match": model_match},
-        "answer_sha256": None if answer is None else sha(answer.encode("utf-8")),
+        "answer_sha256": None if answer is None else sha(answer.encode("utf-8")), "answer": answer,
         "exit_status": exit_status, "duplicates_of": sorted(duplicates),
     })
     test.assertEqual(stored, expected_completed)

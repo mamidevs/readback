@@ -159,12 +159,12 @@ def no_review_record(attempt_id, created, result, repository, contract_path, con
 
 
 def completed_record(started, capture_after, binding_text, validation, judge, answer_digest, exit_status,
-                     duplicates):
-    """The started fields plus the fields of the end of the run."""
+                     duplicates, answer=None):
+    """The started fields plus the fields of the end of the run. `answer` is the answer text, else null."""
     record = dict(started)
     record.update({
         "capture_after": capture_after, "binding": binding_text, "validation": validation, "judge": judge,
-        "answer_sha256": answer_digest, "exit_status": exit_status, "duplicates_of": duplicates,
+        "answer_sha256": answer_digest, "answer": answer, "exit_status": exit_status, "duplicates_of": duplicates,
     })
     return record
 
