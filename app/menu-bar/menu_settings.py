@@ -91,6 +91,9 @@ def access(project, binding, args, book):
         info = os.fstat(fd)
         registry.require(identifier(home, binding, info.st_dev, info.st_ino) == project["id"],
                          "The selected project changed", "IDENTITY_MISMATCH")
+        if args.command == "session-detail":
+            import menu_activity
+            return menu_activity.for_session(project, binding, book, args.host, args.session)
         if args.command == "sessions":
             import menu_sessions
             return menu_sessions.for_project(project, binding, book)
@@ -122,6 +125,10 @@ def main():
     route.add_argument("model")
     route.add_argument("effort")
     commands.add_parser("sessions").add_argument("id")
+    detail = commands.add_parser("session-detail")
+    detail.add_argument("id")
+    detail.add_argument("host", choices=("claude", "codex"))
+    detail.add_argument("session")
     args = parser.parse_args()
     book = Path.home() / "logbook"
     control = book / ".readback"

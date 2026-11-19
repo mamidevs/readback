@@ -191,26 +191,30 @@ struct SessionList: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(model.sessions, id: \.self) { session in
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack {
-                                    Image(systemName: "terminal").font(.caption)
-                                        .foregroundStyle(.secondary).accessibilityHidden(true)
-                                    Text(session.host == "claude" ? "Claude Code" : "Codex")
-                                        .font(.callout.weight(.medium))
-                                    Spacer()
-                                    HStack(spacing: 4) {
-                                        Circle()
-                                            .fill(session.status == "running" ? PanelStyle.accent : Color.secondary)
-                                            .frame(width: 5, height: 5)
-                                        Text(session.status == "running" ? "Çalışıyor" : "Kayıtlı")
-                                            .font(.caption).foregroundStyle(.secondary)
+                            Button {
+                                model.showActivity(session)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "terminal").font(.callout)
+                                        .foregroundStyle(.secondary)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(session.providerName).font(.callout.weight(.semibold))
+                                        Text(session.id.prefix(8)).font(.system(.caption, design: .monospaced))
+                                            .foregroundStyle(.secondary)
                                     }
+                                    Spacer()
+                                    Text(session.statusLabel).font(.caption).foregroundStyle(.secondary)
+                                    Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                                        .foregroundStyle(.secondary)
                                 }
-                                Text(session.id).font(.system(.caption, design: .monospaced))
-                                    .textSelection(.enabled)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .accessibilityLabel(session.id)
+                                .frame(minHeight: 36)
+                                .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
+                            .help("Oturum etkinliğini aç")
+                            .accessibilityLabel("\(session.providerName) oturumu, \(session.id)")
+                            .accessibilityValue(session.statusLabel)
+                            .accessibilityIdentifier("rb.session.\(session.host).\(session.id)")
                         }
                     }
                     .padding(.trailing, 4)
@@ -222,5 +226,100 @@ struct SessionList: View {
             }
         }
         .padding(.horizontal, 3)
+    }
+}
+
+struct SessionActivityView: View {
+    @ObservedObject var model: PanelModel
+    let session: ProjectSession
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                model.closeActivity()
+            } label: {
+                Label("Proje oturumları", systemImage: "chevron.left")
+                    .font(.callout.weight(.medium)).foregroundStyle(PanelStyle.accent)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Proje oturumlarına dön")
+            .accessibilityIdentifier("rb.activity.back")
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Text(session.providerName).font(.system(size: 18, weight: .semibold))
+                    Spacer()
+                    if session.host == "codex", UUID(uuidString: session.id) != nil,
+                       let thread = URL(string: "codex://threads/" + session.id) {
+                        Link(destination: thread) {
+                            Label("Codex’te aç", systemImage: "arrow.up.forward.app")
+                                .font(.callout.weight(.medium))
+                        }
+                        .accessibilityIdentifier("rb.activity.openCodex")
+                    }
+                }
+                if let name = model.sessionDetail?.model {
+                    Text(name).font(.system(.callout, design: .monospaced))
+                        .textSelection(.enabled).accessibilityIdentifier("rb.activity.model")
+                }
+                Text(session.id).font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
+                    .textSelection(.enabled).accessibilityIdentifier("rb.activity.id")
+            }
+
+            Divider()
+            Text("Son etkinlikler").font(.callout.weight(.semibold))
+            if let detail = model.sessionDetail {
+                if !detail.available {
+                    Text("Bu oturumun etkinlik kaydı okunamadı.")
+                        .font(.callout).foregroundStyle(.secondary)
+                } else if detail.events.isEmpty {
+                    Text("Henüz gösterilecek etkinlik yok.")
+                        .font(.callout).foregroundStyle(.secondary)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(detail.events.enumerated()), id: \.offset) { index, event in
+                                activityRow(event, index: index)
+                                if index + 1 < detail.events.count { Divider().padding(.leading, 23) }
+                            }
+                        }
+                        .padding(.horizontal, 9)
+                    }
+                    .frame(height: min(198, CGFloat(detail.events.count) * 39))
+                    .background(PanelStyle.inset, in: RoundedRectangle(cornerRadius: 9))
+                }
+            } else {
+                ProgressView().controlSize(.small).accessibilityLabel("Etkinlikler okunuyor")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, 6)
+    }
+
+    private func activityRow(_ event: SessionEvent, index: Int) -> some View {
+        let time = Self.displayTime(event.timestamp)
+        return HStack(spacing: 8) {
+            Image(systemName: index == 0 ? "circle.inset.filled" : "circle")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(index == 0 ? PanelStyle.accent : .secondary)
+            Text(event.label).font(.callout.weight(index == 0 ? .semibold : .regular))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 3)
+            if let time { Text(time).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
+        }
+        .frame(minHeight: 38)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(event.label)
+        .accessibilityValue(time ?? "")
+        .accessibilityIdentifier("rb.activity.event.\(index)")
+    }
+
+    private static func displayTime(_ text: String?) -> String? {
+        guard let text else { return nil }
+        let date = (try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(text))
+            ?? (try? Date.ISO8601FormatStyle().parse(text))
+        guard let date else { return nil }
+        return date.formatted(date: Calendar.current.isDateInToday(date) ? .omitted : .abbreviated,
+                              time: .standard)
     }
 }

@@ -28,7 +28,7 @@ cp "$root/app/menu-bar/Info.plist" "$app/Contents/"
 for helper in readback_settings project_registry outside_judge; do
     cp "$root/scripts/$helper.py" "$app/Contents/Resources/python/"
 done
-cp "$root/app/menu-bar/menu_settings.py" "$root/app/menu-bar/menu_sessions.py" "$app/Contents/Resources/python/"
+cp "$root/app/menu-bar/menu_settings.py" "$root/app/menu-bar/menu_sessions.py" "$root/app/menu-bar/menu_activity.py" "$app/Contents/Resources/python/"
 plutil -lint "$app/Contents/Info.plist" >/dev/null
 codesign --force --sign - "$app"
 codesign --verify --strict "$app"

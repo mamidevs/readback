@@ -36,6 +36,20 @@ struct ProjectSession: Decodable, Hashable {
     let id: String
     let host: String
     let status: String
+
+    var providerName: String { host == "claude" ? "Claude Code" : "Codex" }
+    var statusLabel: String { status == "running" ? "Oturum açık" : "Kayıtlı" }
+}
+
+struct SessionEvent: Decodable {
+    let label: String
+    let timestamp: String?
+}
+
+struct SessionDetail: Decodable {
+    let model: String?
+    let available: Bool
+    let events: [SessionEvent]
 }
 
 struct BridgeResponse: Decodable {
@@ -45,6 +59,7 @@ struct BridgeResponse: Decodable {
     var efforts: [String: [String]]?
     var unavailable: [String]?
     var truncated: Bool?
+    var detail: SessionDetail?
     var sessions: [ProjectSession]?
 }
 
@@ -79,6 +94,9 @@ final class PanelModel: ObservableObject {
     @Published private(set) var sessions: [ProjectSession] = []
     @Published private(set) var sessionsBusy = false
     @Published private(set) var sessionsMessage: String?
+    @Published private(set) var openSession: ProjectSession?
+    @Published private(set) var sessionDetail: SessionDetail?
+    private var activityRevision = 0
     private var watchingSessions = false
     private var sessionsRevision = 0
     private let sessionQueue = DispatchQueue(label: "readback.session.list", qos: .utility)
@@ -169,6 +187,7 @@ final class PanelModel: ObservableObject {
     }
 
     private func clearProjectDetails() {
+        closeActivity()
         routes = [:]
         efforts = [:]
         sessionsRevision += 1
@@ -179,7 +198,36 @@ final class PanelModel: ObservableObject {
 
     func watchSessions(_ enabled: Bool) {
         watchingSessions = enabled
-        if enabled { refreshSessions() }
+        if enabled { refreshSessions() } else { closeActivity() }
+    }
+
+    func showActivity(_ session: ProjectSession) {
+        guard let project = selection, sessions.contains(session) else { return }
+        closeActivity()
+        openSession = session
+        readActivity(project: project, session: session, version: activityRevision)
+    }
+
+    func closeActivity() {
+        activityRevision += 1
+        openSession = nil
+        sessionDetail = nil
+    }
+
+    private func readActivity(project: String, session: ProjectSession, version: Int) {
+        guard activityRevision == version else { return }
+        sessionQueue.async { [bridge] in
+            let args = ["session-detail", project, session.host, session.id]
+            let detail = try? bridge.run(args).detail
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.activityRevision == version else { return }
+                self.sessionDetail = detail ?? SessionDetail(model: nil, available: false, events: [])
+                // Start the next read only after this read finishes; stale selections cannot reschedule.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                    self?.readActivity(project: project, session: session, version: version)
+                }
+            }
+        }
     }
 
     func refreshSessions() {

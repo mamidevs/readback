@@ -7,7 +7,7 @@ private final class PanelController: NSHostingController<SettingsPanel> {
 }
 
 @MainActor
-final class MenuDelegate: NSObject, NSApplicationDelegate {
+final class MenuDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var item: NSStatusItem!
     private let panel = NSPopover()
     private let model = PanelModel(bridge: SettingsBridge(
@@ -30,8 +30,13 @@ final class MenuDelegate: NSObject, NSApplicationDelegate {
         let controller = PanelController(rootView: SettingsPanel(model: model))
         controller.sizingOptions = [.preferredContentSize]
         controller.dismiss = { [weak self] in self?.panel.performClose(nil) }
+        panel.delegate = self
         panel.behavior = .transient
         panel.contentViewController = controller
+    }
+
+    func popoverWillClose(_ notification: Notification) {
+        model.closeActivity()
     }
 
     @objc private func toggle() {

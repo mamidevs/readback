@@ -120,41 +120,10 @@ struct SettingsPanel: View {
             }
             .padding(.bottom, 18)
 
-            HStack {
-                Text("Hakem denetimi").font(.system(size: 13, weight: .semibold))
-                Spacer()
-                if model.busy {
-                    ProgressView().controlSize(.mini).accessibilityLabel("Ayarlar güncelleniyor")
-                }
-            }
-            .padding(.bottom, 7)
-            HStack(spacing: 2) {
-                ForEach(JudgeMode.allCases, id: \.self) { mode in
-                    modeButton(mode)
-                }
-            }
-            .padding(3)
-            .background(PanelStyle.inset, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(PanelStyle.line, lineWidth: 0.7))
-
-            if model.selection != nil {
-                Rectangle().fill(PanelStyle.line).frame(height: 1).padding(.top, 16).padding(.bottom, 4)
-                if let mode = model.mode, mode != .off {
-                    sectionButton("Hakem modelleri", icon: "slider.horizontal.3", kind: .routes, id: "rb.routes")
-                    if section == .routes {
-                        RouteEditor(model: model)
-                            .id(model.selection)
-                            .padding(12)
-                            .background(PanelStyle.inset, in: RoundedRectangle(cornerRadius: 10))
-                            .padding(.bottom, 4)
-                    }
-                }
-                sectionButton("Proje oturumları", icon: "rectangle.stack", kind: .sessions, id: "rb.sessions")
-                if section == .sessions {
-                    SessionList(model: model)
-                        .padding(12)
-                        .background(PanelStyle.inset, in: RoundedRectangle(cornerRadius: 10))
-                }
+            if let session = model.openSession {
+                SessionActivityView(model: model, session: session)
+            } else {
+                settings
             }
             if let message = model.message {
                 Text(message)
@@ -172,6 +141,46 @@ struct SettingsPanel: View {
         .fixedSize(horizontal: false, vertical: true)
         .background(PanelStyle.canvas)
         .tint(PanelStyle.accent)
+    }
+
+    @ViewBuilder
+    private var settings: some View {
+        HStack {
+            Text("Hakem denetimi").font(.system(size: 13, weight: .semibold))
+            Spacer()
+            if model.busy {
+                ProgressView().controlSize(.mini).accessibilityLabel("Ayarlar güncelleniyor")
+            }
+        }
+        .padding(.bottom, 7)
+        HStack(spacing: 2) {
+            ForEach(JudgeMode.allCases, id: \.self) { mode in
+                modeButton(mode)
+            }
+        }
+        .padding(3)
+        .background(PanelStyle.inset, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(PanelStyle.line, lineWidth: 0.7))
+
+        if model.selection != nil {
+            Rectangle().fill(PanelStyle.line).frame(height: 1).padding(.top, 16).padding(.bottom, 4)
+            if let mode = model.mode, mode != .off {
+                sectionButton("Hakem modelleri", icon: "slider.horizontal.3", kind: .routes, id: "rb.routes")
+                if section == .routes {
+                    RouteEditor(model: model)
+                        .id(model.selection)
+                        .padding(12)
+                        .background(PanelStyle.inset, in: RoundedRectangle(cornerRadius: 10))
+                        .padding(.bottom, 4)
+                }
+            }
+            sectionButton("Proje oturumları", icon: "rectangle.stack", kind: .sessions, id: "rb.sessions")
+            if section == .sessions {
+                SessionList(model: model)
+                    .padding(12)
+                    .background(PanelStyle.inset, in: RoundedRectangle(cornerRadius: 10))
+            }
+        }
     }
 
     private func sectionButton(_ title: String, icon: String, kind: PanelSection, id: String) -> some View {
@@ -205,7 +214,7 @@ struct SettingsPanel: View {
                    enabled: model.mode != nil && !model.busy) {
             model.setMode(mode)
         }
-        .frame(maxWidth: .infinity)
+        .frame(minWidth: ModeRowButton.minimumWidth(for: mode.label), maxWidth: .infinity)
         .frame(height: 29)
     }
 }
@@ -241,6 +250,13 @@ private struct ModeButton: NSViewRepresentable {
 
 /// A native control owns each mode segment, including keyboard focus and activation.
 private final class ModeRowButton: NSButton {
+    private static let checkWidth: CGFloat = 14
+
+    static func minimumWidth(for title: String) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        return ceil((title as NSString).size(withAttributes: [.font: font]).width) + checkWidth + 16
+    }
+
     var confirmed = false
     var choose: (() -> Void)?
 
@@ -265,7 +281,7 @@ private final class ModeRowButton: NSButton {
         ]
         let text = title as NSString
         let size = text.size(withAttributes: attributes)
-        let extra: CGFloat = confirmed ? 14 : 0
+        let extra: CGFloat = confirmed ? Self.checkWidth : 0
         let x = floor((bounds.width - size.width - extra) / 2)
         if confirmed {
             let configuration = NSImage.SymbolConfiguration(pointSize: 10, weight: .bold)

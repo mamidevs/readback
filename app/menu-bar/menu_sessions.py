@@ -93,21 +93,28 @@ def codex_running(lock):
     return False
 
 
-def codex_candidates(config, matches):
+def codex_database(config):
     if not config.exists():
-        return [], False, False
+        return None
     databases = [(int(match[1]), p) for p in config.iterdir()
                  if (match := re.fullmatch(r"state_(\d+)\.sqlite", p.name)) and not p.is_symlink()]
     if not databases:
-        return [], False, False
+        return None
     database = max(databases)[1]
-    files, truncated = metadata_files(config / "thread-writer-locks", r"[0-9a-fA-F-]{36}\.lock")
-    locks = {p.stem: p for p in files if valid_id(p.stem)}
     # Read the current WAL when present. A closed database can be read without creating sidecars.
     uri = database.as_uri() + "?mode=ro"
     if not Path(str(database) + "-wal").exists():
         uri += "&immutable=1"
-    with closing(sqlite3.connect(uri, uri=True, timeout=0.25)) as db:
+    return sqlite3.connect(uri, uri=True, timeout=0.25)
+
+
+def codex_candidates(config, matches):
+    connection = codex_database(config)
+    if connection is None:
+        return [], False, False
+    with closing(connection) as db:
+        files, truncated = metadata_files(config / "thread-writer-locks", r"[0-9a-fA-F-]{36}\.lock")
+        locks = {p.stem: p for p in files if valid_id(p.stem)}
         columns = "SELECT id,cwd,updated_at FROM threads WHERE archived=0"
         # Resolve each distinct working directory once, before limiting the
         # selected project's history. Busy threads in another project must not

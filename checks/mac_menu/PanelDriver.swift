@@ -96,6 +96,26 @@ func run() throws {
             throw DriverError("Expected \(args[2]) panel, sampled sRGB brightness \(level)")
         }
         print(level)
+    case "mode-fit":
+        let identifiers = ["rb.mode.off", "rb.mode.gate", "rb.mode.each"]
+        for identifier in identifiers {
+            guard let button = tree(app).first(where: { text($0, "AXIdentifier") == identifier }),
+                  let sizeValue = attribute(button, "AXSize"),
+                  CFGetTypeID(sizeValue) == AXValueGetTypeID() else {
+                throw DriverError("Cannot measure " + identifier)
+            }
+            var size = CGSize.zero
+            guard AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) else {
+                throw DriverError("Cannot read size of " + identifier)
+            }
+            let label = text(button, "AXDescription") as NSString
+            let width = label.size(withAttributes: [.font: NSFont.systemFont(ofSize: 12, weight: .semibold)]).width
+            // Reserve room for the selected glyph, plus a visible margin on both sides.
+            guard label.length > 0 && size.width >= ceil(width) + 14 + 8 else {
+                throw DriverError("Label and checkmark do not fit: " + describe(button) + " width=\(size.width)")
+            }
+            print("\(label) | button \(size.width) | label \(ceil(width))")
+        }
     case "window":
         let entries = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
         let candidates = entries.filter { window in
