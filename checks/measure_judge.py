@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import statistics
 import subprocess
@@ -74,24 +75,50 @@ def diagnostic(message):
     return "unspecified provider error"
 
 
-def read_events(stdout):
-    usage = None
-    completed = False
+def event_name(value):
+    # Only bounded, identifier-shaped type tags may leave the provider trace.
+    return value if isinstance(value, str) and re.fullmatch(r"[a-z][a-z0-9_.]{0,63}", value) else "invalid"
+
+
+def read_events(stdout, prompt, result):
+    """Inventory the full stream before deciding whether it qualifies for scoring."""
+    error = None
     for line in stdout.splitlines():
-        event = json.loads(line)
-        kind = event["type"]
-        if kind in ("turn.failed", "error"):
-            raise JudgeError(diagnostic(event.get("error", event.get("message", ""))))
-        if kind.startswith("item.") and event["item"]["type"] not in ("agent_message", "reasoning"):
-            raise JudgeError("non-text activity in the measured turn")
-        if kind == "turn.completed":
-            if completed:
-                raise JudgeError("more than one completed turn")
-            completed = True
+        try:
+            event = json.loads(line)
+        except (ValueError, UnicodeError):
+            event = {}
+        if not isinstance(event, dict):
+            event = {}
+        kind = event_name(event.get("type"))
+        tag = kind
+        if kind in ("item.started", "item.updated", "item.completed"):
+            item = event.get("item")
+            item = item if isinstance(item, dict) else {}
+            activity = event_name(item.get("type"))
+            tag = f"{kind}:{activity}"
+            echo = activity == "user_message" and item.get("text") == prompt
+            if activity not in ("agent_message", "reasoning") and not echo:
+                error = error or f"unscored activity: {activity}"
+        elif kind == "turn.completed":
+            result["completed_turns"] += 1
+            if result["completed_turns"] > 1:
+                error = error or "more than one completed turn"
             usage = event.get("usage")
-    if not completed:
-        raise JudgeError("missing completed turn")
-    return usage
+            if isinstance(usage, dict):
+                fields = ("input_tokens", "cached_input_tokens", "cache_write_input_tokens",
+                          "output_tokens", "reasoning_output_tokens")
+                tokens = {key: usage[key] for key in fields if type(usage.get(key)) is int and usage[key] >= 0}
+                if tokens:
+                    result["usage"] = tokens
+        elif kind in ("turn.failed", "error"):
+            error = error or diagnostic(event.get("error", event.get("message", "")))
+        elif kind not in ("thread.started", "turn.started"):
+            error = error or f"unrecognized event: {kind}"
+        result["events"].append(tag)
+    if result["completed_turns"] == 0:
+        error = error or "missing completed turn"
+    return error
 
 
 def call(route, prompt, timeout, result):
@@ -110,23 +137,24 @@ def call(route, prompt, timeout, result):
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
         try:
             stdout, stderr = proc.communicate(prompt.encode("utf-8"), timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            stop_group(proc)
+            read_events(exc.output or b"", prompt, result)
+            raise
         except BaseException:
             stop_group(proc)
             raise
         result["exit_code"] = proc.returncode
         if answer_path.is_file():
             result["answer"] = answer_path.read_bytes().decode("utf-8")
+        event_error = read_events(stdout, prompt, result)
         if proc.returncode:
             reason = diagnostic(stderr.decode("utf-8", errors="replace"))
-            if reason == "unspecified provider error":
-                try:
-                    read_events(stdout)
-                except JudgeError as exc:
-                    reason = str(exc)
-                except (KeyError, ValueError, TypeError):
-                    pass
+            if reason == "unspecified provider error" and event_error:
+                reason = event_error
             raise JudgeError(f"provider exited {proc.returncode}: {reason}")
-        result["usage"] = read_events(stdout)
+        if event_error:
+            raise JudgeError(event_error)
         return first_verdict(result["answer"])
 
 
@@ -135,7 +163,7 @@ def attempt(job, out, timeout):
     name, expected, prompt = case
     result = dict(case=name, expected=expected, model=route.model, effort=route.effort,
                   repeat=repeat, prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
-                  answer="", usage=None, exit_code=None, verdict=None, error=None)
+                  answer="", usage=None, events=[], completed_turns=0, exit_code=None, verdict=None, error=None)
     start = time.monotonic()
     try:
         verdict = call(route, prompt, timeout, result)

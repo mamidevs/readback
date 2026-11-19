@@ -18,7 +18,16 @@ assert all(flag in args for flag in ("skip_host_skill_discovery", "shell_tool", 
 assert not list(Path.cwd().iterdir())
 prompt = sys.stdin.buffer.read().decode()
 assert "blind-label" not in prompt and "answer-key.json" not in prompt
+for event in ("thread.started", "turn.started"):
+    print(json.dumps({"type":event, "thread_id":"private-value-omit"}))
 case = prompt.splitlines()[-1]
+if case.startswith("echo"):
+    text = prompt if case == "echo" else "different user message"
+    print(json.dumps({"type":"item.completed", "item":{"type":"user_message", "text":text}}))
+if case == "unknown-event":
+    print(json.dumps({"type":"thread.other", "payload":"private-value-omit"}))
+if case == "unknown-item":
+    print(json.dumps({"type":"item.completed", "item":{"type":"future_item", "body":"private-value-omit"}}))
 model = args[args.index("-m")+1]
 if case == "sleep":
     time.sleep(20)
@@ -26,7 +35,8 @@ if case == "exit":
     print("usage limit for excluded-account-id", file=sys.stderr)
     sys.exit(7)
 if case == "tool":
-    print(json.dumps({"type":"item.completed", "item":{"type":"command_execution"}}))
+    print(json.dumps({"type":"item.started", "item":{"type":"command_execution","command":"private-value-omit"}}))
+    print(json.dumps({"type":"item.completed", "item":{"type":"command_execution","text":"private-value-omit"}}))
 if case == "malformed":
     print("bad-json")
 answer = ("PASS" if model == "alpha" else "FAIL") + "  final answer.\r\n"
@@ -79,6 +89,20 @@ class MeasurementTests(unittest.TestCase):
             self.assertEqual(len({r["prompt_sha256"] for r in rows if r["case"] == case}), 1)
         proc, _ = self.measure([("a", "FAIL")])
         self.assertEqual(proc.returncode, 2)
+
+    def test_invalid_activity_preserves_completion_tokens_and_only_event_names(self):
+        cases = ("tool", "echo", "echo-mismatch", "unknown-event", "unknown-item")
+        proc, rows = self.measure([(c, "PASS") for c in cases])
+        self.assertEqual(proc.returncode, 1, proc.stderr)
+        self.assertEqual([r["outcome"] for r in rows], ["error", "correct_pass", "error", "error", "error"])
+        self.assertEqual(rows[0]["events"], ["thread.started", "turn.started", "item.started:command_execution",
+                                             "item.completed:command_execution", "turn.completed"])
+        self.assertEqual(rows[0]["error"], "unscored activity: command_execution")
+        for row in rows:
+            self.assertEqual(row["completed_turns"], 1)
+            self.assertEqual(row["usage"], {"input_tokens": 19, "output_tokens": 4})
+        self.assertNotIn("private-value-omit", json.dumps(rows))
+        self.assertNotIn("different user message", json.dumps(rows))
 
     def test_provider_failures_are_unscored_and_missing_usage_stays_unknown(self):
         cases = ("exit", "malformed", "tool", "sleep", "incomplete", "no-verdict", "no-tokens")
