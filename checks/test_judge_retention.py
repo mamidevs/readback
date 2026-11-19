@@ -254,6 +254,8 @@ class Retention(unittest.TestCase):
         with patch.object(retention.time, "time", return_value=self.now):
             retention.maybe_prune(self.project)
             self.assertFalse(old.exists())
+            self.assertFalse(list((self.common / "readback").glob(".retention-*")))
+            self.assertEqual(len(list(self.rounds.parent.glob(".retention-*"))), 1)
             late = self.skipped()
             with patch.object(retention.Sweep, "receipts", side_effect=AssertionError("rescanned")):
                 retention.maybe_prune(self.project)

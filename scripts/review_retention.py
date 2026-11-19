@@ -29,7 +29,7 @@ MISSING = {errno.ENOENT, errno.ENOTDIR, errno.ELOOP}
 
 
 @contextmanager
-def directory(path, parent=None):
+def directory(path, parent=None, *, create=False):
     """Pin each directory by descriptor. Symlinks at any level are never traversed."""
     with ExitStack() as stack:
         anchor = Path(path)
@@ -43,6 +43,11 @@ def directory(path, parent=None):
             for part in parts:
                 if part == "..":
                     raise ValueError("parent path is not allowed")
+                if create:
+                    try:
+                        os.mkdir(part, 0o700, dir_fd=current)
+                    except FileExistsError:
+                        pass
                 current = os.open(part, DIRECTORY, dir_fd=current)
                 stack.callback(os.close, current)
         except OSError as exc:
@@ -264,7 +269,16 @@ def _run(project, apply, daily):
             # One clock per project identity. flock also releases on process death.
             identity = json.dumps([project["home"], project["repository"]]).encode()
             stamp = ".retention-" + hashlib.sha256(identity).hexdigest()
-            clock_folder = store if store is not None else book
+            # The maintenance clock is user state. A failed or read-only review
+            # must not change the repository's receipt or accounting directories.
+            clock_folder = book
+            if clock_folder is None:
+                home = stack.enter_context(directory(Path.home()))
+                if home is None:
+                    return sweep.counts
+                clock_folder = stack.enter_context(directory("logbook/.readback", home, create=True))
+                if clock_folder is None:
+                    return sweep.counts
             if store is None and file_stat(clock_folder, stamp) is None:
                 # Shared ledgers may all belong to other repositories. Create a project clock
                 # only after identifying a matching ledger. A concurrent first sweep is idempotent.
