@@ -184,8 +184,8 @@ class GrammarTests(unittest.TestCase):
         self.assertEqual(rules(result), [("V2", None, "unresolved")])
 
     def test_version_and_docstring_describe_version_2(self):
-        self.assertEqual(vh.VALIDATOR_VERSION, "2.0.0")
-        self.assertEqual(vh.validate(CONTRACT, handoff())["validator_version"], "2.0.0")
+        self.assertEqual(vh.VALIDATOR_VERSION, "2.1.0")
+        self.assertEqual(vh.validate(CONTRACT, handoff())["validator_version"], "2.1.0")
         doc = " ".join(vh.__doc__.split())
         # the five section starts, in the words of D1
         self.assertIn("`Limits`, `Definitions`, `Evidence requirements`, `Coverage list` or `Command lines`", doc)
@@ -236,6 +236,23 @@ class GrammarTests(unittest.TestCase):
                          {"id": "ACC-1", "statement": "s", "check": "a\nb", "match": None})
         self.assertEqual(vh._statement("ACC-1", "s", "\u00a0x")["match"], "\u00a0x")
 
+    def test_semicolon_separates_status_entries_in_the_handoff(self):
+        canonical = vh.validate(CONTRACT, handoff())
+        self.assertIs(canonical["valid"], True)
+        for sep in ("; ", ";"):
+            with self.subTest(sep=sep):
+                self.assertEqual(vh.validate(CONTRACT, handoff(contract=sep.join(
+                    ["ACC-1 VERIFIED", "ACC-2 VERIFIED"]))), canonical)
+        for tail in ("ACC-2 FAILED (test failed)", "ACC-2 MISSPELLED", "ACC-1 VERIFIED"):
+            expected = vh.validate(CONTRACT, handoff(contract="ACC-1 VERIFIED | " + tail))
+            self.assertIs(expected["valid"], False)
+            self.assertEqual(vh.validate(CONTRACT, handoff(contract="ACC-1 VERIFIED; " + tail)), expected)
+
+    def test_semicolon_inside_a_status_reason_is_literal(self):
+        reason = "checks (one; two); ACC-3 FAILED"
+        self.assertEqual(vh.parse_statuses("ACC-1 UNVERIFIED (" + reason + "); - ACC-2 VERIFIED"),
+                         ([("ACC-1", "UNVERIFIED", reason), ("ACC-2", "VERIFIED", None)], []))
+
     def test_parse_statuses_forms(self):
         self.assertEqual(vh.parse_statuses("ACC-1 VERIFIED\n\nACC-2 FAILED (x) | - ACC-3 UNVERIFIED\n- ACC-4 FAILED"),
                          ([("ACC-1", "VERIFIED", None), ("ACC-2", "FAILED", "x"),
@@ -253,7 +270,7 @@ class GrammarTests(unittest.TestCase):
                          ("CON-20261117-01", "t", "o", {"note": "a\nb"}, []))
         self.assertEqual([(s["id"], s["statement"], s["check"]) for s in parsed["statements"]],
                          [("ACC-1", "s", "sh a.sh"), ("ACC-2", "s2", "sh b.sh")])
-        self.assertEqual(vh.validate(text, handoff()), {"valid": True, "findings": [], "validator_version": "2.0.0"})
+        self.assertEqual(vh.validate(text, handoff()), {"valid": True, "findings": [], "validator_version": "2.1.0"})
         spaced = vh.parse_contract(json.dumps({"id": "CON-20261117-01", "Out of scope": "o2"}))
         self.assertEqual((spaced["out_of_scope"], spaced["extra"]), ("o2", {}))
         notlist = vh.parse_contract(json.dumps({"id": "CON-20261117-01", "acc": "text", "statements": 5}))
@@ -565,11 +582,11 @@ class EvidenceTests(unittest.TestCase):
     def test_a_result_that_names_a_tool_call_is_complete_evidence(self):
         contract = "CON-20261117-01  T\nACC-1  s   Check: printf tool\n"
         result = vh.validate(contract, handoff(contract="ACC-1 VERIFIED", checks=("printf tool | exit 0 | tool call",)))
-        self.assertEqual(result, {"valid": True, "findings": [], "validator_version": "2.0.0"})
+        self.assertEqual(result, {"valid": True, "findings": [], "validator_version": "2.1.0"})
         contract = "CON-20261117-01  T\nACC-1  s   Check: Grep tool, x\n"
         for line in ("Grep tool, x | no exit code (tool call) | tool call", "Grep tool, x | no exit code (tool call) | one"):
             result = vh.validate(contract, handoff(contract="ACC-1 VERIFIED", checks=(line,)))
-            self.assertEqual(result, {"valid": True, "findings": [], "validator_version": "2.0.0"}, line)
+            self.assertEqual(result, {"valid": True, "findings": [], "validator_version": "2.1.0"}, line)
 
     def test_v4_messages(self):
         # a FAILED status with a cut marker: unresolved, and the status word is shown
@@ -857,7 +874,7 @@ REAL_CONTRACTS = ("CON-20261118-01", "CON-20261118-08", "CON-20261118-11")
 
 
 def ok_result(valid=True, findings=()):
-    return {"valid": valid, "findings": list(findings), "validator_version": "2.0.0"}
+    return {"valid": valid, "findings": list(findings), "validator_version": "2.1.0"}
 
 
 class SectionTests(unittest.TestCase):

@@ -59,6 +59,8 @@ The handoff has these keys in this order. Use JSON with the same keys when a scr
 | issues | Severity (blocking, high, low) and description. Action items only. |
 | next | The first step for the receiver |
 
+In the contract field, separate status entries with a spaced vertical bar, a semicolon or a continuation line.
+
 | Word | Who says it | Meaning |
 |---|---|---|
 | DONE | worker | The task is complete. Every contract statement is VERIFIED. |

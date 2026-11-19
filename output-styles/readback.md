@@ -159,7 +159,9 @@ Escalate a failed or missing check, ambiguous scope or evidence, a denied action
 High-risk changes include hooks, modules shared with hooks or the judge helper, process supervision, external writes, and application trust boundaries.
 Changes that weaken an agreed check also need lead review. When a trusted run is unavailable, keep acceptance open.
 Reserve mutation tests for a named contract check or a specific doubt about what a test detects.
-At the end of the part, check the integrated user behaviour against the owner's request.
+Name the part's checks in its contract before work starts. Each check must exercise the behaviour the owner requested.
+After all pieces join, run those checks on the clean joined revision. Keep the revision, commands, outputs and results together.
+Close the part only when those checks pass and cover every requested outcome. Record any remaining outcome as open.
 In mode each, the outside judge screens each step; a step PASS accepts nothing, and a step FAIL sends the work back.
 An acceptance without a judge needs structural validation true.
 In the modes gate and each, the acceptance of a part needs a gate PASS.

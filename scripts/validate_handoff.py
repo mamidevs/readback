@@ -51,8 +51,8 @@ Text form
   `false`.
   Handoff: one key per line with the keys of PROTOCOL.md 3.3. The value of
   `checks` is one evidence line per physical line. The value of `contract` is
-  `ACC-<n> <STATUS>` parts joined with ` | `; a status may be followed by a
-  reason in parentheses.
+  `ACC-<n> <STATUS>` parts separated by a spaced vertical bar, a semicolon or a
+  continuation line. A semicolon inside a parenthesised reason stays in the reason.
   An evidence line is its parts joined with ` | ` (spaces or tabs around the
   bar). A shell command line is `<command> | exit <n> | <result>`; the command
   is the raw text before the one exit-code segment and may hold ` | `. A tool
@@ -95,7 +95,7 @@ import json
 import re
 import sys
 
-VALIDATOR_VERSION = "2.0.0"
+VALIDATOR_VERSION = "2.1.0"
 
 REQUIRED_KEYS = (
     "id", "from", "date", "state", "readback", "summary", "changes",
@@ -419,6 +419,21 @@ def check_handoff(handoff):
 
 # ------------------------------------------------------------ rule V3
 
+def status_parts(line):
+    """Keep legacy pipe boundaries and split semicolons outside parenthesised reasons."""
+    start = depth = 0
+    for token in re.finditer(r"\s+\|\s+|[();]", line):
+        mark = token.group()
+        if mark == "(":
+            depth += 1
+        elif mark == ")":
+            depth = max(0, depth - 1)
+        elif mark != ";" or depth == 0:
+            yield line[start:token.start()]
+            start, depth = token.end(), 0
+    yield line[start:]
+
+
 def parse_statuses(value):
     """Read the `contract` value. Return (entries, unparsed_parts).
 
@@ -428,7 +443,7 @@ def parse_statuses(value):
     if value.strip().lower() in ("none", "—", "-"):
         return entries, unparsed
     for chunk in value.split("\n"):
-        for part in re.split(r"\s+\|\s+", chunk):
+        for part in status_parts(chunk):
             part = part.strip()
             if part.startswith("- "):
                 part = part[2:].strip()
