@@ -16,7 +16,7 @@
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
     },
     "protocol_version": {
-      "const": "0.7"
+      "enum": ["0.7", "0.8"]
     },
     "profile_version": {
       "const": 1

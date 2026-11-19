@@ -51,7 +51,7 @@ An unbound repository uses `~/logbook/<repository-name>/`. Its records stay outs
 
 ```text
 ~/logbook/my-project/
-  CURRENT.md        # Goal, decisions in force, open work, next step; at most 30 lines
+  CURRENT.md        # Shared goal and decisions, plus open work and next step per task
   LOG.md            # Append-only change and decision history
   records/          # Contracts, handoffs, and judge decisions
 ```
@@ -74,7 +74,7 @@ There is no setup wizard. Read [project identity](docs/project-identity.md) for 
 
 ### Publishing shared records
 
-Only the lead publishes records; workers return handoffs. The Markdown publisher serializes cooperating writers and checks the registry generation and previous `CURRENT.md` hash. Stale updates and duplicate record IDs fail instead of overwriting newer work. Records declare shared scope or specific repository UUIDs.
+Only the lead publishes records; workers return handoffs. The Markdown publisher checks the registry generation and merges each task's OPEN and NEXT under a lock. Sessions working on different tasks can publish from the same starting document. The publisher rejects stale updates to the same block and duplicate record IDs. Records declare shared scope or specific repository UUIDs.
 
 Publication writes a durable journal, record files, LOG, and then CURRENT. Separate files are **not one atomic transaction**. An interruption blocks new publications until the saved operation is retried or its conflict is reconciled. The journal retains the previous CURRENT; it is not a full backup system.
 

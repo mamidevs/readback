@@ -624,12 +624,37 @@ class RegistryTests(unittest.TestCase):
         write_json(path, center)
         self.assert_error(self.resolve, self.repo)
 
+    def test_readers_preserve_both_protocol_versions(self):
+        profile_path = self.home / "profile.json"
+        center_path = self.home / "project.json"
+        for version in ("0.7", "0.8"):
+            project = self.data["projects"][0]
+            profile = json.loads(profile_path.read_bytes())
+            profile["protocol_version"] = version
+            write_json(profile_path, profile)
+            project.update(protocol_version=version, profile_sha256=file_digest(profile_path))
+            center = json.loads(center_path.read_bytes())
+            center.update(protocol_version=version, profile_sha256=project["profile_sha256"])
+            write_json(center_path, center)
+            write_json(self.registry, self.data)
+            files = (profile_path, center_path, self.registry)
+            before = [p.read_bytes() for p in files]
+            for host in ("claude", "codex"):
+                self.assertEqual(self.resolve(self.repo, host)["protocol_version"], version)
+            self.assertEqual([p.read_bytes() for p in files], before)
+        profile["protocol_version"] = "0.7"
+        write_json(profile_path, profile)
+        project["profile_sha256"] = center["profile_sha256"] = file_digest(profile_path)
+        write_json(center_path, center)
+        write_json(self.registry, self.data)
+        self.assert_error(self.resolve, self.repo, code="IDENTITY_MISMATCH")
+
     def test_unknown_versions_and_boolean_generations_are_rejected(self):
         mutations = [
             lambda d: d.update(registry_version=2),
             lambda d: d.update(registry_version=True),
             lambda d: d.update(generation=True),
-            lambda d: d["projects"][0].update(protocol_version="0.8"),
+            lambda d: d["projects"][0].update(protocol_version="9.0"),
             lambda d: d["projects"][0].update(profile_version=2),
             lambda d: d["projects"][0].update(profile_version=True),
             lambda d: d["projects"][0]["home_identity"].update(inode=True),

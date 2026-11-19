@@ -4,7 +4,7 @@ Status: approved. This text is Readback Protocol v0.8. DEC-20261115-01, the owne
 This text includes Amendment 01 (DEC-20261115-04), Amendment 02 (DEC-20261115-07), Amendment 03 (DEC-20261115-12), Amendment 04 (DEC-20261115-15), Amendment 05 (DEC-20261116-01), Amendment 06 (DEC-20261116-04, DEC-20261116-05), Amendment 07 (DEC-20261116-07), Amendment 08 (DEC-20261117-06, DEC-20261117-08, DEC-20261117-09) and Amendment 11 (DEC-20261117-23, DEC-20261117-28, DEC-20261118-01).
 Amendment 03 changed the meaning of two fixed words. Amendment 04 changed the DEC line. Amendment 05 added teammates at other providers. Amendment 06 added the rule about the memory of the host. Amendment 07 made opposite-provider judging automatic. Amendment 08 widened UNVERIFIED and added judge evidence rules. Amendment 11 added the judge modes and replaced the rule that every accepted handoff needs a judge's PASS. Each change gave the text a new number.
 
-This package keeps protocol_version 0.7 in project profiles and in the registry; part 4 of the redesign owns the compatibility in scripts/project_registry.py, the profile, project and registry schemas, and the tests that keep 0.7 projects readable without a silent rewrite.
+Profiles, project identities and registry entries support protocol versions 0.7 and 0.8. Reading an existing project preserves its recorded version.
 
 One format for what the lead says and what it records.
 The owner reads less. A message that leaves items out says how many and where they are.
@@ -330,19 +330,23 @@ CURRENT   <project>
 updated   <YYYY-MM-DD> | after <the last LOG or DEC id that this file covers>
 GOAL      <what the owner wants from this project now>
 IN FORCE  <each standing decision that matters now: the DEC id and 3 to 8 words>
-OPEN      <the work that remains and the asks that wait for the owner>
-NEXT      <one step>
+READBACK-TASK {"repository":"<repository>","task":"<task>","worktree":"<worktree>"}
+OPEN      "<remaining work>"
+NEXT      "<one step>"
+END-READBACK-TASK
 ```
 
-- Write CURRENT.md again after each BRIEF. Replace the old text. The LOG stays add-only.
-- CURRENT.md has at most 30 lines. It names records by id. It does not copy them.
+- At the start of work, read the publisher snapshot for the task. Keep its generation and block digest with your working copy.
+- After each BRIEF, publish OPEN and NEXT for the same repository, task and worktree using that snapshot. Keep GOAL and IN FORCE shared.
+- If a task update conflicts, reread that task and reconcile its open work before publishing. Resolve duplicate LOG or record IDs separately.
+- Preserve earlier unscoped OPEN and NEXT entries until a lead explicitly reconciles them. Keep unresolved blocks when a branch or worktree disappears.
 - CURRENT.md is a summary. If it disagrees with a record, the record wins.
 - Do not write a secret in CURRENT.md.
 - The records hold the state of the work. Do not write it to the memory of the host CLI.
 
 When the owner asks to continue earlier work, do these steps before the work.
 
-1. Read CURRENT.md.
+1. Read the shared fields and the matching task block in CURRENT.md. Retain unresolved blocks from older worktrees.
 2. Read the LOG and DEC lines that are newer than the id in `updated`.
 3. Read the stored handoff that an open item names.
 4. Compare with the repository: the branch, the last commit and the changes that are not committed.

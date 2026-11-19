@@ -11,7 +11,7 @@ You work for one owner. Follow Readback Protocol v0.8 when you speak to the owne
 - Workers and explorers are sub-agents of this CLI. Tell them to use `readback-worker` and `readback-explorer` respectively.
 - If this CLI cannot start a sub-agent, do the work yourself. The independent judge still uses the other provider.
 
-This package keeps protocol_version 0.7 in project profiles and in the registry; part 4 of the redesign owns the compatibility in scripts/project_registry.py, the profile, project and registry schemas, and the tests that keep 0.7 projects readable without a silent rewrite.
+Profiles, project identities and registry entries support protocol versions 0.7 and 0.8. Reading an existing project preserves its recorded version.
 
 ## Every answer
 
@@ -245,8 +245,12 @@ Resolve the helper relative to this skill's directory. Do not change the working
 The registry is optional. An absent registry permits legacy behavior; an invalid registry never does.
 Only the lead writes shared records. Workers return handoffs to the lead.
 An index only locates sources. Read the source before using a decision or claim; rebuild a stale index.
-Shared projects use the profile's record publisher, which serializes writes and rejects stale CURRENT updates.
-Do not bypass the publisher with direct LOG or CURRENT writes in a shared project.
+Use `scripts/publish_records.py` from this installation for both ACTIVE and legacy projects. Workers return handoffs to the lead.
+Choose a stable task ID when work starts. Reuse it when the same task resumes on that worktree.
+Read the task before editing. Use the resolver's registry, working directory and host arguments with `--task <task-id>`. For legacy projects include `--legacy-fallback`.
+Publish with the same arguments and `--request <json-file>`. Supply the snapshot's `expected_generation` and `expected_block_sha256`, a unique `operation_id`, `records`, `log_lines`, `open` and `next`.
+Submit changes to project-wide GOAL or IN FORCE using the whole-CURRENT request and its original document digest. Preserve all existing task blocks.
+All record, LOG and CURRENT writes go through this publisher.
 
 ## LOG: something that outlives the session changed
 
@@ -273,7 +277,7 @@ Write each CONTRACT and each HANDOFF to `records/<id>.md` in that folder. One re
 Read the stored records to find the next number. An id is never used again.
 `<project>` is the name of the repository's root folder. Without a repository, it is the name of the working folder.
 If the work is in another repository than the session's folder, use the name of that repository's root folder.
-Create the folder and the files when they do not exist. If the write is refused, show each record to the owner.
+The publisher creates record storage as needed. If it refuses a write, report the reason and retain the pending records.
 The records hold the state of the work. Do not write it to the memory of the host CLI.
 
 ## CURRENT: after each brief
@@ -287,12 +291,16 @@ CURRENT   <project>
 updated   <YYYY-MM-DD> | after <the last LOG or DEC id that this file covers>
 GOAL      <what the owner wants from this project now>
 IN FORCE  <each standing decision that matters now: the DEC id and 3 to 8 words>
-OPEN      <the work that remains and the asks that wait for the owner>
-NEXT      <one step>
+READBACK-TASK {"repository":"<repository>","task":"<task>","worktree":"<worktree>"}
+OPEN      "<remaining work>"
+NEXT      "<one step>"
+END-READBACK-TASK
 ```
 
-- Write CURRENT.md again after each BRIEF. Replace the old text. The LOG stays add-only.
-- CURRENT.md has at most 30 lines. It names records by id. It does not copy them.
+- At the start of work, read the publisher snapshot for the task. Keep its generation and block digest with your working copy.
+- After each BRIEF, publish OPEN and NEXT for the same repository, task and worktree using that snapshot. Keep GOAL and IN FORCE shared.
+- If a task update conflicts, reread that task and reconcile its open work before publishing. Resolve duplicate LOG or record IDs separately.
+- Preserve earlier unscoped OPEN and NEXT entries until a lead explicitly reconciles them. Keep unresolved blocks when a branch or worktree disappears.
 - CURRENT.md is a summary. If it disagrees with a record, the record wins.
 - Do not write a secret in CURRENT.md.
 
@@ -300,7 +308,7 @@ NEXT      <one step>
 
 When the owner asks to continue earlier work, do these steps before the work.
 
-1. Read CURRENT.md.
+1. Read the shared fields and the matching task block in CURRENT.md. Retain unresolved blocks from older worktrees.
 2. Read the LOG and DEC lines that are newer than the id in `updated`.
 3. Read the stored handoff that an open item names.
 4. Compare with the repository: the branch, the last commit and the changes that are not committed.

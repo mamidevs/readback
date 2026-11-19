@@ -128,6 +128,9 @@ VERSION_SENTENCE = ("This package keeps protocol_version 0.7 in project profiles
                     "the compatibility in scripts/project_registry.py, the profile, project and registry schemas, and the tests "
                     "that keep 0.7 projects readable without a silent rewrite.")
 
+CURRENT_VERSION_SENTENCE = ("Profiles, project identities and registry entries support protocol versions 0.7 and 0.8. "
+                            "Reading an existing project preserves its recorded version.")
+
 # D9
 COMMAND_FORM = ("outside-judge.sh --host <host> [--tier step|gate] [--lineage <CON id>] [--coverage <file>] "
                 "<contract file> <handoff file> <repository folder>")
@@ -343,10 +346,10 @@ class ProtocolTests(TextCase):
         self.assertNotIn(OLD_STYLE_RULE, read("output-styles/readback.md"))
 
     def test_version_sentence_in_protocol(self):
-        self.assert_version_sentence(read("PROTOCOL.md"), "PROTOCOL.md")
+        self.assert_once(read("PROTOCOL.md"), CURRENT_VERSION_SENTENCE, "PROTOCOL.md")
 
     def test_version_sentence_in_output_style(self):
-        self.assert_version_sentence(read("output-styles/readback.md"), "output-styles/readback.md")
+        self.assert_once(read("output-styles/readback.md"), CURRENT_VERSION_SENTENCE, "output-styles/readback.md")
 
     def test_old_amendments_are_unchanged(self):
         for name, digest in OLD_AMENDMENTS:

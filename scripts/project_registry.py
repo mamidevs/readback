@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local project identity and shared Markdown routing for Readback 0.7.
+"""Local project identity and shared Markdown routing for Readback.
 
 The registry is private local configuration. Both host adapters call this module.
 Locks are persistent files: projects.lock and locks/<project_uuid>.lock beside it.
@@ -234,7 +234,7 @@ def validate_profile(profile):
     _keys(profile, PROFILE_KEYS, "Profile")
     require(type(profile["profile_version"]) is int and profile["profile_version"] == 1,
             "Unsupported profile version", "UNSUPPORTED_VERSION")
-    require(profile["protocol_version"] == "0.7", "Unsupported protocol version", "UNSUPPORTED_VERSION")
+    require(profile["protocol_version"] in ("0.7", "0.8"), "Unsupported protocol version", "UNSUPPORTED_VERSION")
     require(isinstance(profile["profile_id"], str) and SLUG.fullmatch(profile["profile_id"]), "Invalid profile ID")
     namespace = profile["extension_namespace"]
     require(isinstance(namespace, str) and SLUG.fullmatch(namespace), "Invalid extension namespace")
@@ -321,7 +321,7 @@ def validate_registry(data, check_filesystem=True):
         require(pid not in project_ids and hid not in home_ids, "Duplicate project or home UUID")
         project_ids.add(pid); home_ids.add(hid)
         require(isinstance(project["slug"], str) and SLUG.fullmatch(project["slug"]), "Invalid project slug")
-        require(project["protocol_version"] == "0.7" and type(project["profile_version"]) is int and project["profile_version"] == 1,
+        require(project["protocol_version"] in ("0.7", "0.8") and type(project["profile_version"]) is int and project["profile_version"] == 1,
                 "Unsupported project version", "UNSUPPORTED_VERSION")
         require(project["activation_state"] in ("STAGED", "ACTIVE"), "Unsupported activation state", "INACTIVE")
         require(isinstance(project["profile_sha256"], str) and SHA256.fullmatch(project["profile_sha256"]), "Invalid profile hash")
@@ -345,6 +345,8 @@ def validate_registry(data, check_filesystem=True):
                 require(center[key] == project[key] and type(center[key]) is type(project[key]), "Center identity differs from registry", "IDENTITY_MISMATCH")
             profile, digest = _read_profile(Path(home) / "profile.json")
             validate_profile(profile)
+            require(profile["protocol_version"] == project["protocol_version"],
+                    "Profile protocol version differs from registry", "IDENTITY_MISMATCH")
             require(digest == project["profile_sha256"], "Profile content differs from registry", "IDENTITY_MISMATCH")
             if project["activation_state"] == "ACTIVE":
                 extension = profile["extensions"].get(profile["extension_namespace"], {})
@@ -478,6 +480,10 @@ def _validate_update(previous, candidate):
         require(old_repos <= new_repos, "Rebinding must retain repository UUIDs")
 
 
+def legacy_publication_id(home):
+    return "legacy-" + hashlib.sha256(os.fsencode(home)).hexdigest()
+
+
 def _require_finished_publications(project):
     """A generation update must not strand an interrupted Markdown publication."""
     folder = Path(project["home"]) / ".readback" / "publications"
@@ -491,27 +497,41 @@ def _require_finished_publications(project):
                     continue
                 operation_id = _uuid(name[:-5])
                 journal = read_json(folder / name, parent_fd)
+                require(type(journal) is dict, "Invalid publication journal")
+                version = journal.get("schema_version")
+                require(type(version) is int and version in (1, 2), "Unsupported publication journal schema")
+                scoped_fields = {"task_scope", "current_after"} if version == 2 else set()
                 _keys(journal, {"schema_version", "state", "request_sha256", "request", "project_uuid",
                                 "registry_generation", "previous_current", "previous_log_sha256", "log_after_sha256",
-                                "log_suffix", "provenance", "record_hashes"}, "Committed publication journal")
-                require(type(journal["schema_version"]) is int and journal["schema_version"] == 1,
-                        "Unsupported publication journal schema")
+                                "log_suffix", "provenance", "record_hashes"} | scoped_fields, "Committed publication journal")
                 require(journal["state"] == "COMMITTED", "Publication is unfinished")
-                require(journal["project_uuid"] == project["project_uuid"], "Publication belongs to another project")
-                require(_integer(journal["registry_generation"]), "Invalid publication generation")
+                legacy = journal["project_uuid"] == legacy_publication_id(project["home"])
+                require(legacy or journal["project_uuid"] == project["project_uuid"], "Publication belongs to another project")
+                gen = journal["registry_generation"]
+                require(_integer(gen) or (legacy and gen is None), "Invalid publication generation")
                 request = journal["request"]
-                _keys(request, {"operation_id", "expected_generation", "expected_current_sha256", "records", "log_lines", "current"},
+                if version == 2:
+                    _keys(journal["task_scope"], {"repository", "worktree", "task"}, "Task scope")
+                    require(all(_text(v) for v in journal["task_scope"].values())
+                            and isinstance(journal["current_after"], str), "Invalid task publication")
+                    fields = {"expected_block_sha256", "open", "next"}
+                    text_fields = ("open", "next")
+                    hash_field = "expected_block_sha256"
+                else:
+                    fields = {"expected_current_sha256", "current"}
+                    text_fields = ("current",)
+                    hash_field = "expected_current_sha256"
+                _keys(request, {"operation_id", "expected_generation", "records", "log_lines"} | fields,
                       "Publication request")
-                require(request["operation_id"] == operation_id and _integer(request["expected_generation"]) and
+                require(request["operation_id"] == operation_id and type(request["expected_generation"]) is type(gen) and
                         request["expected_generation"] == journal["registry_generation"],
                         "Publication identity differs from its journal")
                 require(journal["request_sha256"] == hashlib.sha256(canonical_json(request)).hexdigest(),
                         "Publication request hash differs")
-                for key in ("expected_current_sha256",):
-                    require(request[key] is None or isinstance(request[key], str) and SHA256.fullmatch(request[key]),
-                            "Invalid publication CURRENT hash")
+                require(request[hash_field] is None or isinstance(request[hash_field], str) and SHA256.fullmatch(request[hash_field]),
+                        "Invalid publication CURRENT hash")
                 require(type(request["records"]) is list and type(request["log_lines"]) is list and
-                        isinstance(request["current"], str), "Invalid publication request fields")
+                        all(isinstance(request[k], str) for k in text_fields), "Invalid publication request fields")
                 for key in ("previous_current",):
                     require(journal[key] is None or isinstance(journal[key], str), "Invalid previous CURRENT")
                 require(journal["previous_log_sha256"] is None or isinstance(journal["previous_log_sha256"], str) and

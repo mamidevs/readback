@@ -80,6 +80,95 @@ class PublicationTests(unittest.TestCase):
                 "--registry", str(self.registry), "--cwd", str(self.repo),
                 "--host", "codex", "--request", str(request_file)]
 
+    def task_request(self, number, snapshot):
+        request = self.request(number, records=[], expected_generation=snapshot["expected_generation"])
+        del request["current"], request["expected_current_sha256"]
+        request.update(expected_block_sha256=snapshot["expected_block_sha256"],
+                       open=f"Open {number}", next=f"Next {number}")
+        return request
+
+    def test_task_recovery_binds_scope_and_guards_full_current_updates(self):
+        def view(task):
+            return publisher.snapshot(self.registry, self.repo, "claude", task)
+        a = self.task_request(10, view("one"))
+        b = self.task_request(11, view("two"))
+        self.publish(a, task="one")
+        with self.assertRaisesRegex(RuntimeError, "LOG.md"):
+            self.publish(b, task="two", fail_after="LOG.md")
+        self.expect_error(b, "CONFLICT", task="one")
+        self.publish(b, task="two")
+        self.assertTrue(self.publish(a, task="one")["replayed"])
+        before = self.state_files()
+        self.expect_error(self.request(12), "CONFLICT")
+        self.assertEqual(self.state_files(), before)
+        self.assertEqual((view("one")["open"], view("two")["next"]), ("Open 10", "Next 11"))
+        self.fixture.apply()
+
+    def legacy_fixture(self):
+        self.enter_home = mock.patch.dict(os.environ, {"HOME": str(self.base)})
+        self.enter_home.start()
+        self.addCleanup(self.enter_home.stop)
+        repo = self.base / "repositories" / "legacy"
+        self.fixture.git_init(repo)
+        return repo, self.base / "alternate" / "projects.json"
+
+    def test_legacy_prepared_retry_survives_unrelated_registry_change(self):
+        repo, path = self.legacy_fixture()
+        snap = publisher.snapshot(path, repo, "codex", "one", True)
+        req = self.task_request(10, snap)
+        args = dict(task="one", legacy_fallback=True)
+        with self.assertRaisesRegex(RuntimeError, "LOG.md"):
+            publisher.publish(path, repo, "codex", req, fail_after="LOG.md", **args)
+        registry.init_registry(path)
+        fresh = self.task_request(11, snap)
+        self.fixture.assert_error(publisher.publish, path, repo, "claude", fresh, code="CONFLICT", **args)
+        competing = self.base / "other" / repo.name
+        self.fixture.git_init(competing)
+        self.fixture.assert_error(publisher.publish, path, competing, "claude", req, code="CONFLICT", **args)
+        publisher.publish(path, repo, "claude", req, **args)
+        self.assertEqual(publisher.snapshot(path, repo, "claude", "one", True)["next"], "Next 10")
+
+    def test_alternate_registry_paths_contend_on_same_legacy_home(self):
+        repo, path = self.legacy_fixture()
+        other = self.base / "elsewhere" / "registry.json"
+        before = publisher.snapshot(other, repo, "claude", "two", True)
+        req = self.task_request(11, before)
+        def competing_write(*args, **kwargs):
+            # Called after the first publisher has the home lock. The second must
+            # hit its deadline before it can prepare an operation at this home.
+            with mock.patch.object(publisher.time, "monotonic", side_effect=[0, 6]):
+                self.fixture.assert_error(publisher.publish, other, repo, "claude", req,
+                                          task="two", legacy_fallback=True, code="BUSY")
+            return write(*args, **kwargs)
+        write = publisher.write
+        a = self.task_request(10, publisher.snapshot(path, repo, "codex", "one", True))
+        with mock.patch.object(publisher, "write", side_effect=competing_write):
+            publisher.publish(path, repo, "codex", a, task="one", legacy_fallback=True)
+        publisher.publish(other, repo, "claude", req, task="two", legacy_fallback=True)
+        self.assertEqual(publisher.snapshot(other, repo, "claude", "one", True)["open"], "Open 10")
+
+    def test_active_registry_accepts_existing_legacy_journals_at_same_home(self):
+        repo, path = self.legacy_fixture()
+        snap = publisher.snapshot(path, repo, "codex", "one", True)
+        req = self.task_request(10, snap)
+        publisher.publish(path, repo, "codex", req, task="one", legacy_fallback=True)
+        home = self.base / "logbook" / repo.name
+        parked = self.base / "legacy-contents"
+        home.rename(parked)
+        project = self.fixture.project_fixture(home, repo)
+        for child in parked.iterdir():
+            child.rename(home / child.name)
+        registry.init_registry(path)
+        self.fixture.registry, self.fixture.home = path, home
+        self.fixture.data = registry.apply_registry(path, {"registry_version": 1, "generation": 0,
+                                                           "projects": [project]}, 0)
+        self.fixture.activate()
+        self.assertTrue(publisher.publish(path, repo, "claude", req, task="one")["replayed"])
+        fresh = self.task_request(11, publisher.snapshot(path, repo, "claude", "two"))
+        publisher.publish(path, repo, "claude", fresh, task="two")
+        self.assertEqual((home / "CURRENT.md").read_text().count("Open 10"), 1)
+        self.fixture.apply()
+
     def test_normal_publication_preserves_scope_provenance_and_prior_log(self):
         before = b"LOG-20261116-01 | Existing history without newline"
         (self.home / "LOG.md").write_bytes(before)

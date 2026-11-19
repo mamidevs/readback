@@ -8,13 +8,33 @@ At startup the lead resolves the actual working directory, shows repository/proj
 
 ## Markdown publication
 
-An ACTIVE profile declares `storage: markdown-single-writer` in its named extension. Only the lead publishes records; workers return their handoffs. `scripts/publish_records.py` acquires the same project and registry locks as the resolver configuration writer. Its request includes a unique operation UUID, expected registry generation, expected CURRENT SHA-256 (null when absent), records, LOG lines and the next CURRENT text.
+Both hosts publish through `scripts/publish_records.py`. An ACTIVE profile declares `storage: markdown-single-writer` in its named extension. For an unbound repository pass `--legacy-fallback` to use its resolved legacy home. A staged or invalid binding still stops publication.
 
-Every new record declares `scope: shared` or a list of registered repository UUIDs. Record IDs are exclusive. The publication journal retains the previous CURRENT and request. Publication order is journal, immutable record files, LOG content, CURRENT, then committed receipt. LOG includes record content hashes. CURRENT remains at most30 lines.
+Start by taking a snapshot of your task. Use the same task ID and working directory for the publication. In a Readback checkout, for example:
 
-This is not a transaction across files. An interrupted publication remains visible in `.readback/publications/` and blocks another publication. Retry the exact saved request with the same operation UUID to complete it. Changed files or generations return a conflict and require reconciliation; never delete an unfinished journal or silently discard an orphan record. Reusing an operation UUID with different content fails.
+```sh
+python3 -B scripts/publish_records.py --registry "$HOME/logbook/.readback/projects.json" --cwd "$PWD" --host codex --legacy-fallback --task import-catalog
+```
 
-The publisher checks CURRENT under the lock, so a stale lead cannot overwrite another lead's summary. It limits requests to1MiB, journals to4MiB and LOG to16MiB; a limit failure preserves existing data. Archive/rotation is deliberate maintenance, not automatic deletion. Locks coordinate cooperating tools; they do not prevent an unrestricted same-user process from editing files directly. The publication lock does not cover model calls, tests, or code editing.
+The snapshot contains the repository and worktree identity, registry generation, task block digest and current OPEN/NEXT values. A missing block has a null digest. Keep the generation and digest from the snapshot you actually edited. To publish, add `--request /path/to/request.json` to the same command. A task request contains:
+
+```json
+{
+  "operation_id": "f38a4c5d-cfce-4cdb-9ac5-c56c588071ae",
+  "expected_generation": null,
+  "expected_block_sha256": null,
+  "records": [],
+  "log_lines": ["LOG-20261119-01 | catalog | doc:import | Started checking input rows. | Import request. | - | input.csv"],
+  "open": "Check the remaining input rows.",
+  "next": "Validate the supplier column."
+}
+```
+
+Use a fresh operation UUID and available record IDs. Copy the actual snapshot values in place of the sample nulls. Each immutable record declares shared scope or registered repository UUIDs. Tasks share GOAL and IN FORCE. Their OPEN and NEXT entries live in separate blocks keyed by repository, task ID and worktree. Older unscoped text remains readable. Removing a branch or working tree leaves its unresolved work in the logbook.
+
+The publisher reads the latest CURRENT under the publication lock, checks the target block digest, and merges the update. Distinct tasks can publish from the same starting document. A stale update to the same block returns CONFLICT before recording the losing request. Reread that block and reconcile its work. Duplicate LOG or record IDs also return a conflict. Allocate a free ID before submitting the revised request. For an interrupted operation, retry its exact saved request with its original UUID.
+
+Use the whole-document request for project-wide changes. It uses `current` and `expected_current_sha256` in place of the task fields. Base it on the full document and preserve all task blocks. The publication journal precedes immutable records, LOG and CURRENT. The committed receipt follows those writes. Recovery checks the original state and content hashes. Locks coordinate cooperating writers and are held during publication only.
 
 ## Selective reading
 

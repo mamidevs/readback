@@ -70,7 +70,7 @@ def build():
     files["readback/scripts/judge.md"] = body(ROOT / "agents" / "judge.md")
     files["readback/scripts/guard_git.py"] = (ROOT / "hooks" / "guard_git.py").read_text(encoding="utf-8")
     files["readback/scripts/judge_line.py"] = (ROOT / "hooks" / "judge_line.py").read_text(encoding="utf-8")
-    for helper in ("project_registry.py", "resolve_codex_project.py", "resolve_claude_project.py", "project_index.py", "publish_records.py",
+    for helper in ("project_registry.py", "resolve_codex_project.py", "resolve_claude_project.py", "project_index.py", "publish_records.py", "task_current.py",
                    "review_receipt.py", "review_capture.py", "review_redaction.py", "review_retention.py", "validate_handoff.py", "commit_observation.py",
                    "readback_settings.py", "readback_session.py", "judge_rounds.py"):
         files[f"readback/scripts/{helper}"] = (ROOT / "scripts" / helper).read_text(encoding="utf-8")

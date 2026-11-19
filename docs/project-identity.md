@@ -35,7 +35,7 @@ A directory replacement requires an explicit rebind retaining its logical UUID.
 The registry does not support moving a registered home to another path.
 These local observations are not portable cryptographic identities.
 
-`project.json` and `profile.json` must agree with the registry.
+`project.json` and `profile.json` must agree with the registry, including their protocol version. Readers accept 0.7 and 0.8 and preserve the version on disk.
 The profile hash covers exact file bytes, including whitespace.
 Copying a center's UUIDs does not register another location.
 Unknown versions, duplicate JSON keys, unexpected core fields, and conflicting bindings fail closed.
@@ -97,7 +97,7 @@ Unknown locations are rejected unless `--legacy-fallback` is supplied.
 A missing registry then permits an unrelated repository-name fallback without creating configuration directories.
 An empty registry behaves the same way, with generation `0`; a missing registry reports generation `null`.
 Malformed or conflicting registries always fail, even with fallback requested.
-`LEGACY_FALLBACK` is a compatibility candidate, with `write_allowed: false`; it does not grant registered project authority.
+`LEGACY_FALLBACK` is a compatibility candidate, with `write_allowed: false`; it does not grant registered project authority. To publish records there, pass `--legacy-fallback` to the publisher as well. It verifies the destination under lock.
 The lead follows the core record rules only for this explicit compatibility status.
 
 An unregistered worktree of a known Git common directory is always rejected.
