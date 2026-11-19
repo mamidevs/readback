@@ -822,7 +822,8 @@ if not prompt.strip() or os.environ.get("READBACK_JUDGE_ACTIVE") != "1":
     sys.exit(96)
 mode = os.environ.get("FAKE_MODE", "success")
 if mode == "auth_error":
-    print("PASS this must not override the exit code")
+    print("PASS mock-private-stdout")
+    print("mock-private-stderr", file=sys.stderr)
     sys.exit(17)
 if mode == "sleep":
     time.sleep(60)
@@ -975,7 +976,7 @@ def reviews_of(common):
 
 def expect_records(test, repo, run, contract_bytes, handoff_bytes, *, route, verdict, answer, exit_status,
                    models, window, before=None, after=None, expected_binding="ends-equal", duplicates=(),
-                   validation=None, completed=True, line=True, model_match="UNVERIFIED"):
+                   validation=None, completed=True, line=True, model_match="UNVERIFIED", provider_failure=None):
     """Check the stored files of a run against values computed here. Return the attempt id."""
     repo = Path(os.path.realpath(repo))
     common = str(repo / ".git")
@@ -1038,6 +1039,8 @@ def expect_records(test, repo, run, contract_bytes, handoff_bytes, *, route, ver
         "answer_sha256": None if answer is None else sha(answer.encode("utf-8")), "answer": answer,
         "exit_status": exit_status, "duplicates_of": sorted(duplicates),
     })
+    if provider_failure is not None:
+        expected_completed["provider_failure"] = provider_failure
     test.assertEqual(stored, expected_completed)
     if after["state"] == "ok":
         test.assertEqual(file_map(markers), {os.path.join(after["manifest_sha256"], attempt): sha(b"")})
@@ -1153,13 +1156,15 @@ class HelperTests(unittest.TestCase):
 
     def test_provider_error_deadline_missing_command_and_unreadable_contract(self):
         outcomes = (
-            ("provider exit code", {"FAKE_MODE": "auth_error"}, 1),
-            ("missed deadline", {"FAKE_MODE": "sleep", "READBACK_JUDGE_SECONDS": "2"}, 1),
-            ("missing command", {"PATH": None}, 0),
-            ("unreadable contract", {"UNREADABLE": "1"}, 0),
+            ("provider exit code", {"FAKE_MODE": "auth_error"}, {"kind": "nonzero_exit", "exit_code": 17}),
+            ("missed deadline", {"FAKE_MODE": "sleep", "READBACK_JUDGE_SECONDS": "2"}, {"kind": "deadline"}),
+            ("unusable reply", {"FAKE_ANSWER": "mock-private-answer"}, {"kind": "invalid_reply"}),
+            ("missing command", {"PATH": None}, None),
+            ("unreadable contract", {"UNREADABLE": "1"}, None),
         )
         for host, provider in HOSTS:
-            for label, extra, started in outcomes:
+            for label, extra, diagnostic in outcomes:
+                started = int(diagnostic is not None)
                 with self.subTest(provider=provider, outcome=label):
                     repo, contract, handoff, c_bytes, h_bytes = self.case(host)
                     extra = dict(extra)
@@ -1180,8 +1185,27 @@ class HelperTests(unittest.TestCase):
                         self.assertFalse(os.path.exists(repo / ".git" / "readback"))
                         continue
                     new.contract_path, new.handoff_path = os.path.realpath(contract), os.path.realpath(handoff)
+                    models = ["claude-fable-5-2"] if provider == "claude" and label == "unusable reply" else "unattested"
                     expect_records(self, repo, new, c_bytes, h_bytes, route=route_object(provider), verdict="none",
-                                   answer=None, exit_status=3, window=(began, ended), models="unattested")
+                                   answer=None, exit_status=3, window=(began, ended), models=models,
+                                   provider_failure=diagnostic)
+                    self.assertNotIn(b"mock-private", new.out + new.err)
+                    done, = (repo / ".git" / "readback" / "reviews").glob("*/*.completed.json")
+                    self.assertNotIn(b"mock-private", done.read_bytes())
+
+    def test_failed_provider_launch_records_only_its_kind(self):
+        for host, provider in HOSTS:
+            with self.subTest(provider=provider):
+                repo, contract, handoff, _, _ = self.case(host)
+                (self.world.base / "bin" / provider).write_text("#!/mock-private-missing-interpreter\n")
+                run = run_helper(self.world, HELPER, host, contract, handoff, repo)
+                self.assertEqual((run.code, run.calls), (3, []))
+                done, = (repo / ".git" / "readback" / "reviews").glob("*/*.completed.json")
+                record = json.loads(done.read_bytes())
+                self.assertEqual(record["provider_failure"], {"kind": "launch_failed"})
+                self.assertEqual((record["judge"]["verdict"], record["answer"], record["answer_sha256"]),
+                                 ("none", None, None))
+                self.assertNotIn(b"mock-private", done.read_bytes() + run.out + run.err)
 
     def test_a_missing_contract_or_handoff_and_an_empty_one_start_no_provider(self):
         for host, provider in HOSTS:

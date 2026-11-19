@@ -292,6 +292,8 @@ receipt    none | <reason>
 The helper prints one of the two receipt forms.
 
 When receipt setup succeeds, the helper stores a started record below the Git common directory before the provider call; after a non-interrupted call it attempts to store a completed record.
+A completed receipt for a failed provider attempt records `provider_failure.kind` as `launch_failed`, `deadline`, `nonzero_exit` or `invalid_reply`.
+Only `nonzero_exit` adds the integer `provider_failure.exit_code`. The diagnostic stores no provider text.
 Without a stored completed record, the receipt is `receipt    none | <reason>`.
 In the first form, `false n` gives the number of defects that the structural validator found.
 A receipt changes no verdict.

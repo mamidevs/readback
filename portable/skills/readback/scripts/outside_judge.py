@@ -45,6 +45,16 @@ class JudgeError(Exception):
     """A failure that must never become a verdict or trigger another provider."""
 
 
+class ProviderError(JudgeError):
+    """The CLI message stays separate from the bounded fields stored in the receipt."""
+
+    def __init__(self, message, kind="invalid_reply", exit_code=None):
+        super().__init__(message)
+        self.diagnostic = {"kind": kind}
+        if exit_code is not None:
+            self.diagnostic["exit_code"] = exit_code
+
+
 class Route(NamedTuple):
     provider: str
     model: str
@@ -346,7 +356,7 @@ def run_process(command, prompt, repo, env, seconds):
     try:
         watchdog, mark = judge_rounds.start_reaper(seconds)
     except Exception as exc:
-        raise JudgeError("could not start the judge command") from exc
+        raise ProviderError("could not start the judge command", "launch_failed") from exc
     try:
         process = subprocess.Popen(
             command, cwd=repo, env=env, stdin=subprocess.PIPE,
@@ -354,20 +364,21 @@ def run_process(command, prompt, repo, env, seconds):
             encoding="utf-8", errors="replace", start_new_session=True,
             preexec_fn=lambda: os.write(mark, str(os.getpid()).encode()),  # the watchdog learns the group before exec
         )
-    except OSError as exc:
-        raise JudgeError("could not start the judge command") from exc
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ProviderError("could not start the judge command", "launch_failed") from exc
     finally:
         os.close(mark)
     try:
         stdout, _stderr = process.communicate(prompt, timeout=seconds)
     except subprocess.TimeoutExpired as exc:
         stop_group(process)
-        raise JudgeError("the judge exceeded the deadline") from exc
+        raise ProviderError("the judge exceeded the deadline", "deadline") from exc
     except BaseException:
         stop_group(process)
         raise
     if process.returncode != 0:
-        raise JudgeError("the judge command ended with code " + str(process.returncode))
+        raise ProviderError("the judge command ended with code " + str(process.returncode),
+                            "nonzero_exit", process.returncode)
     return stdout
 
 
@@ -399,30 +410,30 @@ def adapter_command(route, executable, repo, answer_path, env):
 def claude_answer(stdout, requested_model):
     try:
         result = json.loads(stdout)
-    except (ValueError, TypeError) as exc:
-        raise JudgeError("Claude returned invalid JSON") from exc
+    except (ValueError, TypeError, RecursionError) as exc:
+        raise ProviderError("Claude returned invalid JSON") from exc
     if not isinstance(result, dict) or result.get("is_error") is not False:
-        raise JudgeError("Claude returned an error or no success status")
+        raise ProviderError("Claude returned an error or no success status")
     if result.get("type") != "result" or result.get("subtype") != "success":
-        raise JudgeError("Claude did not finish successfully")
+        raise ProviderError("Claude did not finish successfully")
     answer = result.get("result")
     if not isinstance(answer, str) or not answer.strip():
-        raise JudgeError("Claude returned no answer")
+        raise ProviderError("Claude returned no answer")
     usage = result.get("modelUsage")
     if not isinstance(usage, dict) or not usage:
-        raise JudgeError("Claude did not report its model usage")
+        raise ProviderError("Claude did not report its model usage")
     models = set(usage)
     if "model" in result:
         if not isinstance(result["model"], str):
-            raise JudgeError("Claude returned invalid model metadata")
+            raise ProviderError("Claude returned invalid model metadata")
         models.add(result["model"])
     if is_fable(requested_model):
         if any(not is_fable(model) for model in models):
-            raise JudgeError("Claude reported a model outside the requested Fable family")
+            raise ProviderError("Claude reported a model outside the requested Fable family")
         if requested_model != "fable" and models != {requested_model}:
-            raise JudgeError("Claude reported a model different from the requested model")
+            raise ProviderError("Claude reported a model different from the requested model")
     elif requested_model.startswith("claude-") and models != {requested_model}:
-        raise JudgeError("Claude reported a model different from the requested model")
+        raise ProviderError("Claude reported a model different from the requested model")
     reported = ", ".join(sorted(models))
     return answer, reported if models != {requested_model} else "", sorted(models)
 
@@ -435,7 +446,7 @@ def first_verdict(answer):
             if match:
                 return match.group(1)
             break
-    raise JudgeError("the answer does not start with PASS or FAIL")
+    raise ProviderError("the answer does not start with PASS or FAIL")
 
 
 def none_receipt(reason):
@@ -482,7 +493,8 @@ def start_receipt(repo, route, rules, inputs, call=None):
     return {"started": started, "common": common}
 
 
-def finish_receipt(state, repo, validation, verdict, answer, models, exit_status, model_match="UNVERIFIED"):
+def finish_receipt(state, repo, validation, verdict, answer, models, exit_status, model_match="UNVERIFIED",
+                   provider_failure=None):
     """Store the completed record after the provider ended and return the receipt line."""
     if "started" not in state:
         if state.get("recapture"):  # D7: the second capture is attempted, its result is not stored
@@ -498,6 +510,8 @@ def finish_receipt(state, repo, validation, verdict, answer, models, exit_status
             review_receipt.answer_sha256(answer), exit_status,
             review_receipt.duplicates_of(common, started["review_key"], started["attempt_id"]), answer,
         )
+        if provider_failure is not None:
+            completed["provider_failure"] = provider_failure
         path, _marker = review_receipt.store_completed(common, completed)
     except InterruptedError:
         raise
@@ -726,10 +740,10 @@ def main(argv=None):
                     try:
                         answer = answer_path.read_text(encoding="utf-8")
                     except (OSError, UnicodeError) as exc:
-                        raise JudgeError("Codex returned no readable answer") from exc
+                        raise ProviderError("Codex returned no readable answer") from exc
                 kept = answer.encode("utf-8", "replace")
                 if len(kept) > KEEP_LIMIT:
-                    raise JudgeError("the answer is too large to keep")
+                    raise ProviderError("the answer is too large to keep")
                 verdict = first_verdict(answer)
             except JudgeError as error:
                 failure = error
@@ -737,7 +751,8 @@ def main(argv=None):
                     judge_rounds.finish(reservation, "none")
                 except judge_rounds.RoundError as accounting:
                     failure = JudgeError(accounting.note)  # D7: the accounting note wins over the provider's error
-                receipt = finish_receipt(state, repo, validation, "none", None, models, 3)
+                diagnostic = error.diagnostic if isinstance(error, ProviderError) else None
+                receipt = finish_receipt(state, repo, validation, "none", None, models, 3, provider_failure=diagnostic)
                 raise failure
             except (KeyboardInterrupt, InterruptedError):
                 with contextlib.suppress(judge_rounds.RoundError):
