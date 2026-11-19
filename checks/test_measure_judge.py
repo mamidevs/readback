@@ -13,6 +13,7 @@ import json, os, sys, time
 from pathlib import Path
 args = sys.argv[1:]
 assert "--ephemeral" in args and "--ignore-user-config" in args and "--ignore-rules" in args
+assert any(args[i:i+2] == ["-c", "suppress_unstable_features_warning=true"] for i in range(len(args)))
 assert args[args.index("-s")+1] == "read-only" and args[-1] == "-"
 assert all(flag in args for flag in ("skip_host_skill_discovery", "shell_tool", "multi_agent", "apps", "plugins", "hooks"))
 assert not list(Path.cwd().iterdir())
@@ -24,6 +25,8 @@ case = prompt.splitlines()[-1]
 if case.startswith("echo"):
     text = prompt if case == "echo" else "different user message"
     print(json.dumps({"type":"item.completed", "item":{"type":"user_message", "text":text}}))
+if case == "item-error":
+    print(json.dumps({"type":"item.completed", "item":{"type":"error", "message":"private-value-omit"}}))
 if case == "unknown-event":
     print(json.dumps({"type":"thread.other", "payload":"private-value-omit"}))
 if case == "unknown-item":
@@ -91,13 +94,14 @@ class MeasurementTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 2)
 
     def test_invalid_activity_preserves_completion_tokens_and_only_event_names(self):
-        cases = ("tool", "echo", "echo-mismatch", "unknown-event", "unknown-item")
+        cases = ("tool", "echo", "echo-mismatch", "unknown-event", "unknown-item", "item-error")
         proc, rows = self.measure([(c, "PASS") for c in cases])
         self.assertEqual(proc.returncode, 1, proc.stderr)
-        self.assertEqual([r["outcome"] for r in rows], ["error", "correct_pass", "error", "error", "error"])
+        self.assertEqual([r["outcome"] for r in rows], ["error", "correct_pass", "error", "error", "error", "error"])
         self.assertEqual(rows[0]["events"], ["thread.started", "turn.started", "item.started:command_execution",
                                              "item.completed:command_execution", "turn.completed"])
         self.assertEqual(rows[0]["error"], "unscored activity: command_execution")
+        self.assertEqual(rows[-1]["error"], "unscored activity: error")
         for row in rows:
             self.assertEqual(row["completed_turns"], 1)
             self.assertEqual(row["usage"], {"input_tokens": 19, "output_tokens": 4})

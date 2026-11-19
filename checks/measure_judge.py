@@ -128,7 +128,8 @@ def call(route, prompt, timeout, result):
         env = os.environ.copy()
         cmd = adapter_command(route, "codex", cwd, answer_path, env)
         # No host integrations, instruction files, search or local execution in the screen.
-        options = ["--enable", "skip_host_skill_discovery", "-c", 'web_search="disabled"']
+        options = ["--enable", "skip_host_skill_discovery", "-c", 'web_search="disabled"',
+                   "-c", "suppress_unstable_features_warning=true"]
         for feature in ("shell_tool", "unified_exec", "multi_agent", "apps", "plugins", "hooks",
                         "memories", "image_generation", "view_image", "skill_search"):
             options.extend(["--disable", feature])
