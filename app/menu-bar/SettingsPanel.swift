@@ -12,6 +12,7 @@ struct PanelPicker: NSViewRepresentable {
     let label: String
     let identifier: String
     var placeholder: String? = nil
+    var prominent = false
     let select: (String) -> Void
 
     final class Coordinator: NSObject {
@@ -24,7 +25,13 @@ struct PanelPicker: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(select: select) }
 
     func makeNSView(context: Context) -> NSPopUpButton {
-        let button = NSPopUpButton(frame: .zero, pullsDown: false)
+        let button: NSPopUpButton = prominent ? ProjectButton(frame: .zero, pullsDown: false)
+                                              : NSPopUpButton(frame: .zero, pullsDown: false)
+        if prominent {
+            button.isBordered = false
+            button.focusRingType = .exterior
+        }
+        button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         button.target = context.coordinator
         button.action = #selector(Coordinator.picked(_:))
         button.setAccessibilityLabel(label)
@@ -56,6 +63,31 @@ struct PanelPicker: NSViewRepresentable {
     }
 }
 
+/// The visible project name remains a real pop-up control, including its keyboard actions.
+private final class ProjectButton: NSPopUpButton {
+    override func draw(_ dirtyRect: NSRect) {
+        let font = NSFont.systemFont(ofSize: 20, weight: .semibold)
+        let style = NSMutableParagraphStyle()
+        style.lineBreakMode = .byTruncatingTail
+        let color: NSColor = isEnabled ? .labelColor : .secondaryLabelColor
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color, .paragraphStyle: style]
+        let name = titleOfSelectedItem ?? "Proje seç"
+        let natural = (name as NSString).size(withAttributes: attributes)
+        let width = min(natural.width.rounded(.up), max(0, bounds.width - 24))
+        let rect = NSRect(x: 0, y: floor((bounds.height - natural.height) / 2), width: width, height: natural.height)
+        (name as NSString).draw(in: rect, withAttributes: attributes)
+        let configuration = NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+            .applying(.init(hierarchicalColor: .secondaryLabelColor))
+        let image = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration)
+        if let image {
+            let size = image.size
+            image.draw(in: NSRect(x: width + 7, y: bounds.midY - size.height / 2, width: size.width, height: size.height),
+                       from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        }
+    }
+}
+
 struct SettingsPanel: View {
     @ObservedObject var model: PanelModel
     @State private var section: PanelSection?
@@ -71,60 +103,75 @@ struct SettingsPanel: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 7) {
-                Text("Proje").font(.headline)
-                PanelPicker(options: projectOptions, selection: model.selection, label: "Proje",
-                            identifier: "rb.project", placeholder: "Proje seç", select: model.select)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 26)
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Hakem ne zaman devreye girsin?").font(.headline)
-                    Spacer()
-                    if model.busy {
-                        ProgressView().controlSize(.small)
-                            .accessibilityLabel("Ayarlar güncelleniyor")
-                    }
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 13) {
+                Image(systemName: "book.closed.fill")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(Color(nsColor: PanelStyle.onPine))
+                    .frame(width: 42, height: 42)
+                    .background(PanelStyle.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Proje").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                    PanelPicker(options: projectOptions, selection: model.selection, label: "Proje",
+                                identifier: "rb.project", placeholder: "Proje seç", prominent: true, select: model.select)
+                        .frame(maxWidth: .infinity).frame(height: 26)
                 }
+            }
+            .padding(.bottom, 18)
+
+            HStack {
+                Text("Hakem denetimi").font(.system(size: 13, weight: .semibold))
+                Spacer()
+                if model.busy {
+                    ProgressView().controlSize(.mini).accessibilityLabel("Ayarlar güncelleniyor")
+                }
+            }
+            .padding(.bottom, 7)
+            HStack(spacing: 2) {
                 ForEach(JudgeMode.allCases, id: \.self) { mode in
                     modeButton(mode)
                 }
             }
+            .padding(3)
+            .background(PanelStyle.inset, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(PanelStyle.line, lineWidth: 0.7))
 
             if model.selection != nil {
-                VStack(alignment: .leading, spacing: 4) {
-                    Divider().padding(.bottom, 4)
-                    if let mode = model.mode, mode != .off {
-                        sectionButton("Hakem modelleri", icon: "slider.horizontal.3", kind: .routes, id: "rb.routes")
-                        if section == .routes {
-                            RouteEditor(model: model)
-                                .id(model.selection)
-                                .padding(.vertical, 4)
-                        }
-                    }
-                    sectionButton("Proje oturumları", icon: "rectangle.stack", kind: .sessions, id: "rb.sessions")
-                    if section == .sessions {
-                        SessionList(model: model)
+                Rectangle().fill(PanelStyle.line).frame(height: 1).padding(.top, 16).padding(.bottom, 4)
+                if let mode = model.mode, mode != .off {
+                    sectionButton("Hakem modelleri", icon: "slider.horizontal.3", kind: .routes, id: "rb.routes")
+                    if section == .routes {
+                        RouteEditor(model: model)
+                            .id(model.selection)
+                            .padding(12)
+                            .background(PanelStyle.inset, in: RoundedRectangle(cornerRadius: 10))
+                            .padding(.bottom, 4)
                     }
                 }
+                sectionButton("Proje oturumları", icon: "rectangle.stack", kind: .sessions, id: "rb.sessions")
+                if section == .sessions {
+                    SessionList(model: model)
+                        .padding(12)
+                        .background(PanelStyle.inset, in: RoundedRectangle(cornerRadius: 10))
+                }
             }
-
             if let message = model.message {
                 Text(message)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 8)
                     .accessibilityIdentifier("rb.message")
             }
         }
-        .padding(18)
-        .frame(width: 340, alignment: .leading)
+        .padding(.horizontal, 18)
+        .padding(.top, 18)
+        .padding(.bottom, model.selection == nil ? 18 : 10)
+        .frame(width: 348, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
+        .background(PanelStyle.canvas)
+        .tint(PanelStyle.accent)
     }
 
     private func sectionButton(_ title: String, icon: String, kind: PanelSection, id: String) -> some View {
@@ -133,18 +180,21 @@ struct SettingsPanel: View {
             section = expanded ? nil : kind
             model.watchSessions(section == .sessions)
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: icon).frame(width: 16).foregroundStyle(.secondary)
-                Text(title)
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 18)
+                    .foregroundStyle(expanded ? PanelStyle.accent : .secondary)
+                Text(title).font(.system(size: 13, weight: .medium))
                 Spacer()
                 Image(systemName: expanded ? "chevron.down" : "chevron.right")
                     .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 3)
-            .frame(height: 28)
+            .frame(height: 34)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(.plain)
         .accessibilityLabel(title)
         .accessibilityValue(expanded ? "Açık" : "Kapalı")
         .accessibilityIdentifier(id)
@@ -156,7 +206,7 @@ struct SettingsPanel: View {
             model.setMode(mode)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 32)
+        .frame(height: 29)
     }
 }
 
@@ -182,7 +232,6 @@ private struct ModeButton: NSViewRepresentable {
         button.setAccessibilityLabel(mode.label)
         button.setAccessibilityIdentifier("rb.mode." + mode.rawValue)
         button.setAccessibilityValue(confirmed ? "Seçili" : "")
-        button.symbol = mode.symbol
         button.confirmed = confirmed
         button.isEnabled = enabled
         button.choose = choose
@@ -190,9 +239,8 @@ private struct ModeButton: NSViewRepresentable {
     }
 }
 
-/// A single native control owns the entire row, including keyboard focus and activation.
+/// A native control owns each mode segment, including keyboard focus and activation.
 private final class ModeRowButton: NSButton {
-    var symbol = ""
     var confirmed = false
     var choose: (() -> Void)?
 
@@ -203,35 +251,33 @@ private final class ModeRowButton: NSButton {
     override func drawFocusRingMask() { outline.fill() }
 
     private var outline: NSBezierPath {
-        NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 7, yRadius: 7)
+        NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 6, yRadius: 6)
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        if isHighlighted || confirmed {
-            (isHighlighted ? NSColor.quaternaryLabelColor
-                           : NSColor.controlAccentColor.withAlphaComponent(0.12)).setFill()
+        if confirmed || isHighlighted {
+            (confirmed ? PanelStyle.pine : NSColor.quaternaryLabelColor).setFill()
             outline.fill()
         }
-        let foreground: NSColor = isEnabled ? .labelColor : .disabledControlTextColor
-        let symbolColor: NSColor = isEnabled ? .secondaryLabelColor : .disabledControlTextColor
-        drawSymbol(symbol, color: symbolColor, centerX: 19)
-
+        let color: NSColor = confirmed ? PanelStyle.onPine : (isEnabled ? .labelColor : .disabledControlTextColor)
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: NSFont.systemFontSize), .foregroundColor: foreground
+            .font: NSFont.systemFont(ofSize: 12, weight: confirmed ? .semibold : .regular), .foregroundColor: color
         ]
         let text = title as NSString
-        let height = text.size(withAttributes: attributes).height
-        text.draw(at: NSPoint(x: 38, y: (bounds.height - height) / 2), withAttributes: attributes)
-        if confirmed { drawSymbol("checkmark", color: .controlAccentColor, centerX: bounds.maxX - 18) }
-    }
-
-    private func drawSymbol(_ name: String, color: NSColor, centerX: CGFloat) {
-        let base = NSImage(systemSymbolName: name, accessibilityDescription: nil)
-        guard let image = base?.withSymbolConfiguration(.init(hierarchicalColor: color)) else { return }
-        let size = image.size
-        let rect = NSRect(x: centerX - size.width / 2, y: bounds.midY - size.height / 2,
-                          width: size.width, height: size.height)
-        image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1,
-                   respectFlipped: true, hints: nil)
+        let size = text.size(withAttributes: attributes)
+        let extra: CGFloat = confirmed ? 14 : 0
+        let x = floor((bounds.width - size.width - extra) / 2)
+        if confirmed {
+            let configuration = NSImage.SymbolConfiguration(pointSize: 10, weight: .bold)
+                .applying(.init(hierarchicalColor: color))
+            if let image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil)?
+                .withSymbolConfiguration(configuration) {
+                let iconSize = image.size
+                image.draw(in: NSRect(x: x, y: bounds.midY - iconSize.height / 2,
+                                      width: iconSize.width, height: iconSize.height),
+                           from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            }
+        }
+        text.draw(at: NSPoint(x: x + extra, y: floor((bounds.height - size.height) / 2)), withAttributes: attributes)
     }
 }

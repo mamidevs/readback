@@ -16,16 +16,19 @@ struct RouteEditor: View {
 
     var body: some View {
         let activeTier = model.mode == .each ? tier : "gate"
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .bottom, spacing: 12) {
                 labeledPicker("Çalışılan araç", options: hosts, choice: $host, id: "rb.host")
                 if model.mode == .each {
                     labeledPicker("Kontrol", options: tiers, choice: $tier, id: "rb.tier")
                 } else {
-                    Text("Bölüm sonu").font(.callout).foregroundStyle(.secondary)
+                    Label("Bölüm sonu", systemImage: "flag")
+                        .font(.caption).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .trailing)
+                        .frame(height: 24)
                 }
             }
+            Rectangle().fill(PanelStyle.line).frame(height: 1)
             if let route = model.routes[host]?[activeTier] {
                 RouteFields(route: route, modelNames: suggestions, efforts: model.efforts[host] ?? [], busy: model.busy,
                             provider: host == "claude" ? "Codex" : "Claude") { name, effort in
@@ -50,7 +53,7 @@ struct RouteEditor: View {
     private func labeledPicker(_ title: String, options: [PickerOption],
                                choice: Binding<String>, id: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(title).font(.caption.weight(.medium)).foregroundStyle(.secondary)
             PanelPicker(options: options, selection: choice.wrappedValue, label: title, identifier: id) {
                 choice.wrappedValue = $0
             }
@@ -85,24 +88,29 @@ private struct RouteFields: View {
         let changed = name != route.model || effort != route.effort
         let valid = name.range(of: #"\A[A-Za-z0-9][A-Za-z0-9._:/-]*\z"#, options: .regularExpression) != nil
         VStack(alignment: .leading, spacing: 7) {
-            Text("\(provider) hakem modeli").font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 5) {
+                Image(systemName: "arrow.turn.down.right")
+                    .font(.caption.weight(.medium)).foregroundStyle(PanelStyle.accent)
+                    .accessibilityHidden(true)
+                Text("\(provider) hakem modeli").font(.system(size: 12, weight: .semibold))
+            }
             ModelPicker(name: $name, suggestions: modelNames, label: "\(provider) hakem modeli")
                 .frame(maxWidth: .infinity).frame(height: 24)
                 .help("Önerilen modellerden birini seçin veya model adını yazın.")
             if changed && !valid {
                 Text("Geçerli bir model adı girin.").font(.caption).foregroundStyle(.secondary)
             }
-            HStack(alignment: .bottom, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Düşünme düzeyi").font(.caption).foregroundStyle(.secondary)
-                    let all = efforts.contains(effort) ? efforts : [effort] + efforts
-                    PanelPicker(options: all.map { PickerOption(id: $0, title: $0) },
-                                selection: effort, label: "Düşünme düzeyi", identifier: "rb.effort") {
-                        effort = $0
-                    }
-                    .frame(maxWidth: .infinity).frame(height: 24)
+            HStack(spacing: 7) {
+                Text("Düşünme düzeyi").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                let all = efforts.contains(effort) ? efforts : [effort] + efforts
+                PanelPicker(options: all.map { PickerOption(id: $0, title: $0) },
+                            selection: effort, label: "Düşünme düzeyi", identifier: "rb.effort") {
+                    effort = $0
                 }
+                .frame(minWidth: 64, maxWidth: .infinity).frame(height: 24)
                 Button("Kaydet") { save(name, effort) }
+                    .buttonStyle(.borderedProminent)
+                    .tint(PanelStyle.accent)
                     .disabled(!changed || !valid || !efforts.contains(effort) || busy)
                     .accessibilityIdentifier("rb.save")
             }
@@ -159,11 +167,13 @@ struct SessionList: View {
     @ObservedObject var model: PanelModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 if model.sessionsBusy {
                     ProgressView().controlSize(.small).accessibilityLabel("Oturumlar okunuyor")
-                } else if model.sessions.isEmpty && model.sessionsMessage == nil {
+                } else if !model.sessions.isEmpty {
+                    Text("\(model.sessions.count) oturum").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                } else if model.sessionsMessage == nil {
                     Text("Bu proje için oturum bulunamadı.").font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -183,11 +193,18 @@ struct SessionList: View {
                         ForEach(model.sessions, id: \.self) { session in
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack {
+                                    Image(systemName: "terminal").font(.caption)
+                                        .foregroundStyle(.secondary).accessibilityHidden(true)
                                     Text(session.host == "claude" ? "Claude Code" : "Codex")
                                         .font(.callout.weight(.medium))
                                     Spacer()
-                                    Text(session.status == "running" ? "Çalışıyor" : "Kayıtlı")
-                                        .font(.caption).foregroundStyle(.secondary)
+                                    HStack(spacing: 4) {
+                                        Circle()
+                                            .fill(session.status == "running" ? PanelStyle.accent : Color.secondary)
+                                            .frame(width: 5, height: 5)
+                                        Text(session.status == "running" ? "Çalışıyor" : "Kayıtlı")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
                                 }
                                 Text(session.id).font(.system(.caption, design: .monospaced))
                                     .textSelection(.enabled)
