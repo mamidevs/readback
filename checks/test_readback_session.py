@@ -103,8 +103,17 @@ def invalid_cases():
         cases.append((label, raw, reason))
 
     for label, raw in (("empty", b""), ("brace", b"{"), ("half", b'{"a": '), ("bad utf-8", b"\xff\xfe\x00{}"),
-                       ("text", b"not json"), ("deep", b"[" * 50000 + b"]" * 50000)):
+                       ("text", b"not json")):
         add("not JSON " + label, raw, "not JSON")
+    # Some JSON decoders can parse this depth. The decoded array is still an invalid session.
+    deep_array = b"[" * 50000 + b"]" * 50000
+    try:
+        json.loads(deep_array)
+    except RecursionError:
+        deep_reason = "not JSON"
+    else:
+        deep_reason = "not an object"
+    add("deep array", deep_array, deep_reason)
     for label, raw in (("list", b"[]"), ("null", b"null"), ("string", b'"x"'), ("number", b"3"), ("true", b"true"),
                        ("state in list", b"[" + jbytes(good_state()) + b"]")):
         add("not an object " + label, raw, "not an object")
