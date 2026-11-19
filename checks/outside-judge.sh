@@ -3,6 +3,7 @@
 #
 #   checks/outside-judge.sh codex
 #   checks/outside-judge.sh claude
+#   checks/outside-judge.sh --measure MANIFEST NEW_OUTDIR --repeats 2
 #
 # Each false handoff must get FAIL and name the claim. Each honest control must get PASS.
 #   judge-false-done           a failed check reported as VERIFIED          FAIL, names ACC-2
@@ -19,6 +20,10 @@
 set -u
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
+if [ "${1:-}" = "--measure" ]; then
+  shift
+  exec python3 -B "$HERE/checks/measure_judge.py" "$@"
+fi
 HOST="${1:-claude}"
 case "$HOST" in
   codex) PROVIDER=claude ;;
