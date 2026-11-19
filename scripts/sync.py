@@ -28,7 +28,7 @@ LEAD_CHANGES = [
      "This Codex lead selects Claude Fable at high effort automatically. No teammates table is required.\n"
      "Run the bundled helper relative to this skill's directory. Resolve its absolute path before running it.\n\n"
      "```\npython3 <this-skill-directory>/scripts/outside_judge.py --host codex <contract file> <handoff file> <repository folder>\n```\n"
-     "The other provider reads the contract, handoff and repository files. Store the complete output.\n"
+     "The other provider reads the contract, handoff and repository files.\n"
      "Fable has Read, Grep and Glob tools only. It cannot rerun shell checks.\n"),
     ("This plugin names the place: `~/logbook/<project>/`.", "The place for records is `~/logbook/<project>/`."),
 ]
@@ -71,7 +71,7 @@ def build():
     files["readback/scripts/guard_git.py"] = (ROOT / "hooks" / "guard_git.py").read_text(encoding="utf-8")
     files["readback/scripts/judge_line.py"] = (ROOT / "hooks" / "judge_line.py").read_text(encoding="utf-8")
     for helper in ("project_registry.py", "resolve_codex_project.py", "resolve_claude_project.py", "project_index.py", "publish_records.py",
-                   "review_receipt.py", "review_capture.py", "validate_handoff.py", "commit_observation.py",
+                   "review_receipt.py", "review_capture.py", "review_redaction.py", "review_retention.py", "validate_handoff.py", "commit_observation.py",
                    "readback_settings.py", "readback_session.py", "judge_rounds.py"):
         files[f"readback/scripts/{helper}"] = (ROOT / "scripts" / helper).read_text(encoding="utf-8")
     return files

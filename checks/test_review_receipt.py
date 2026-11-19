@@ -1016,7 +1016,8 @@ def expect_records(test, repo, run, contract_bytes, handoff_bytes, *, route, ver
             "round": {"attempt": 1, "fails_before": 0, "authorization": None}}  # D9: the first attempt of a chain
     expected_started = {
         "schema_version": 1, "attempt_id": attempt, "review_key": key, "created": created,
-        "repository": {"root_name": repo.name, "worktree_root": str(repo), "head": head, "branch": "main"},
+        "repository": {"root_name": repo.name, "worktree_root": str(repo), "head": head, "branch": "main",
+                       "git_common_dir_sha256": sha(os.fsencode(common))},
         "capture_before": before,
         "contract": {"path": run.contract_path, "sha256": sha(contract_bytes)},
         "handoff": {"path": run.handoff_path, "sha256": sha(handoff_bytes)},
@@ -1379,6 +1380,7 @@ class HelperTests(unittest.TestCase):
         started = [n for n in reviews_of(common)[key] if n.endswith(".started.json")][0]
         stored = json.loads(Path(common, "readback", "reviews", key, started).read_text())
         self.assertEqual(stored["repository"], {
+            "git_common_dir_sha256": sha(os.fsencode(common)),
             "root_name": repo.name, "worktree_root": os.path.realpath(repo),
             "head": git(repo, "rev-parse", "HEAD").strip(), "branch": None})
         folder = fresh_dir(self.world, "unborn")
@@ -1394,6 +1396,7 @@ class HelperTests(unittest.TestCase):
         started = [n for n in reviews_of(common)[key] if n.endswith(".started.json")][0]
         stored = json.loads(Path(common, "readback", "reviews", key, started).read_text())
         self.assertEqual(stored["repository"], {
+            "git_common_dir_sha256": sha(os.fsencode(common)),
             "root_name": "unborn repo", "worktree_root": os.path.realpath(empty), "head": None, "branch": "trunk"})
         self.assertEqual(stored["capture_before"], cap("ok", own_identity(empty)))
 

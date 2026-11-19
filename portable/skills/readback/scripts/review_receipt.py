@@ -28,6 +28,8 @@ import stat
 import subprocess
 import time
 
+from review_redaction import redact, redact_value
+
 SCHEMA_VERSION = 1
 CAPTURE_SECONDS = 5
 STARTED_SUFFIX = ".started.json"
@@ -171,7 +173,7 @@ def completed_record(started, capture_after, binding_text, validation, judge, an
 
 def clean_field(text):
     """A line break becomes a space and `|` becomes `_`."""
-    return text.replace("\n", " ").replace("\r", " ").replace("|", "_")
+    return redact(text).replace("\n", " ").replace("\r", " ").replace("|", "_")
 
 
 def receipt_line(attempt_id, binding_text, validation, completed_path):
@@ -227,7 +229,7 @@ def repository_info(repo):
 
 
 def encode_record(record):
-    return (json.dumps(record, sort_keys=True, indent="  ") + "\n").encode("ascii")
+    return (json.dumps(redact_value(record), sort_keys=True, indent="  ") + "\n").encode("ascii")
 
 
 def _write(fd, data):

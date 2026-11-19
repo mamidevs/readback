@@ -574,7 +574,8 @@ class GuardTests(WorldCase):
 
 PLUGIN_FILES = ("scripts/outside-judge.sh", "scripts/outside_judge.py", "scripts/review_capture.py",
                 "scripts/review_receipt.py", "scripts/validate_handoff.py", "scripts/readback_settings.py",
-                "scripts/readback_session.py", "scripts/project_registry.py", "scripts/judge_rounds.py", "agents/judge.md")
+                "scripts/readback_session.py", "scripts/project_registry.py", "scripts/judge_rounds.py",
+                "scripts/review_redaction.py", "scripts/review_retention.py", "agents/judge.md")
 RECEIPT_RE = r"^receipt    [0-9a-f]{32} \| ends-equal \| validation true \| .+$"
 
 
@@ -630,7 +631,9 @@ class BytecodeTests(WorldCase):
         result = subprocess.run([sys.executable, "-c", "import review_receipt"], cwd=copy / "scripts", env=env,
                                 capture_output=True, timeout=30, check=True)
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(len(bytecode_below(copy)), 2)  # the folder and one .pyc file
+        artifacts = [Path(path) for path in bytecode_below(copy)]
+        self.assertIn(copy / "scripts" / "__pycache__", artifacts)
+        self.assertTrue(any(p.name.startswith("review_receipt.") and p.suffix == ".pyc" for p in artifacts))
         with self.assertRaises(AssertionError):
             self.assertEqual(bytecode_below(copy), [])
 

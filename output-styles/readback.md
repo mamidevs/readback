@@ -178,7 +178,7 @@ JUDGE     <PASS, FAIL or none> | <the judge> | <repo@sha or none> | <what the ju
 ACCEPTED  <yes or no> | <date> | <the reason, when no>
 ```
 
-Store the complete outside-judge output below the handoff, including its reasoning, execution line and receipt line. Do not keep only the verdict.
+Read the full answer. Store its JUDGE, execution and receipt lines below the handoff. Summarize any finding that affects ACCEPTED without sensitive details. The completed receipt keeps the detailed answer for 30 days.
 
 ```
 JUDGE      <PASS, FAIL or none> | <provider:model> | <repo@sha or none> | <note>

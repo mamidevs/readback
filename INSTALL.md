@@ -55,7 +55,7 @@ Codex leads use Claude Code with `fable` at high effort.
 The integrations pass their host automatically. No `TEAMMATES.md` file is required.
 
 The other provider receives the contract and handoff, and its CLI can read repository files.
-The lead stores the full judgment. Failed calls give `JUDGE none` and leave the work unaccepted.
+The completed receipt stores the masked judgment. The lead keeps the decision and receipt reference in the handoff. Failed calls give `JUDGE none` and leave the work unaccepted.
 There is no silent local or model fallback.
 [TEAMMATES.example.md](TEAMMATES.example.md) describes optional overrides and legacy table compatibility.
 Removing an override file restores the defaults; it does not disable the judge.
@@ -83,6 +83,24 @@ claude --plugin-dir ./readback
 ```
 
 The plugin loads for that session only.
+
+## Review record maintenance
+
+Completed judge details become eligible for deletion after 30 days. The judge helper checks on use, at most once a day. To preview what can be removed from an idle repository, run this from the Readback checkout. Use the host that resolves the project (`codex` or `claude`).
+
+```sh
+python3 -B scripts/review_retention.py --host codex /path/to/project
+```
+
+Add `--apply` to remove the listed details. Cleanup uses physical directory paths and verifies each record belongs to the repository. An older receipt from a removed worktree can survive if its ownership cannot be established. The round ledger continues to enforce the retry limit. Expired details may no longer be available through old receipt links.
+
+Measurement output lives in the directory chosen for each run. Preview a completed batch with the command below. Add `--apply` to remove expired prompt, answer and error text while keeping the measurement results.
+
+```sh
+python3 -B checks/measure_judge.py --prune /path/to/completed-batch
+```
+
+These commands leave source contracts, handoffs and backups in their owner's custody. Older handoffs may contain a full copy of an answer.
 
 ## Update
 

@@ -1,10 +1,12 @@
 """Offline CLI integration tests. A local stub supplies Codex events and answers."""
+import hashlib
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 ENTRY = Path(__file__).resolve().with_name("outside-judge.sh")
@@ -22,6 +24,12 @@ assert "blind-label" not in prompt and "answer-key.json" not in prompt
 for event in ("thread.started", "turn.started"):
     print(json.dumps({"type":event, "thread_id":"private-value-omit"}))
 case = prompt.splitlines()[-1]
+if case.startswith("privacy"):
+    import hashlib
+    assert "packet-canary" not in prompt and "token=<secret>" in prompt
+    answer_detail = hashlib.sha256(prompt.encode()).hexdigest() + " password=answer-canary"
+    if case == "privacy-error":
+        print(json.dumps({"type": "ghp_diagnosticcanary"}))
 if case.startswith("echo"):
     text = prompt if case == "echo" else "different user message"
     print(json.dumps({"type":"item.completed", "item":{"type":"user_message", "text":text}}))
@@ -43,6 +51,8 @@ if case == "tool":
 if case == "malformed":
     print("bad-json")
 answer = ("PASS" if model == "alpha" else "FAIL") + "  final answer.\r\n"
+if case.startswith("privacy"):
+    answer = "PASS " + answer_detail
 if case == "no-verdict":
     answer = "Maybe"
 Path(args[args.index("-o")+1]).write_bytes(answer.encode())
@@ -75,6 +85,84 @@ class MeasurementTests(unittest.TestCase):
                               cwd=self.base, env=dict(os.environ, PATH=str(self.base) + ":" + os.environ["PATH"]),
                               capture_output=True, text=True, timeout=15)
         return proc, [json.loads(p.read_text()) for p in sorted(out.glob("result-*.json"))]
+
+    def prune(self, batch, *options):
+        return subprocess.run(["bash", str(ENTRY), "--measure", "--prune", str(batch), *options],
+                              cwd=self.base, capture_output=True, text=True, timeout=5)
+
+    def test_masks_actual_provider_input_and_persisted_outputs(self):
+        proc, rows = self.measure([("token=packet-canary\r\nprivacy", "PASS"),
+                                   ("token=packet-canary\r\nprivacy-error", "FAIL")])
+        self.assertEqual(proc.returncode, 1, proc.stderr)
+        self.assertEqual([r["outcome"] for r in rows], ["correct_pass", "error"])
+        self.assertIn("<secret>", rows[1]["error"])
+        for index, row in enumerate(rows, 1):
+            record = self.base / "out" / f"input-{index:04d}.json"
+            prompt = json.loads(record.read_text())["prompt"]
+            self.assertIn("token=<secret>\r\n", prompt)
+            digest = hashlib.sha256(prompt.encode()).hexdigest()
+            self.assertEqual(row["prompt_sha256"], digest)
+            self.assertEqual(row["answer"], f"PASS {digest} password=<secret>")
+        for path in (self.base / "out").iterdir():
+            for canary in ("packet-canary", "answer-canary", "ghp_diagnosticcanary"):
+                self.assertNotIn(canary.encode(), path.read_bytes())
+
+    def test_expire_only_text_after_30_days_and_preserve_metrics(self):
+        proc, rows = self.measure([("a", "PASS"), ("no-verdict", "FAIL")])
+        self.assertEqual(proc.returncode, 1, proc.stderr)
+        batch = (self.base / "out").resolve()
+        summary = batch / "summary.json"
+        summary_bytes = summary.read_bytes()
+        original_inputs = [(batch / f"input-{i:04d}.json").read_bytes() for i in (1, 2)]
+        unrelated = batch / "notes.json"
+        unrelated.write_text('{"answer":"mine"}')
+        for days, apply, count in [(29, True, 0), (30, False, 4), (30, True, 4), (31, True, 0)]:
+            with self.subTest(days=days, apply=apply):
+                stamp = time.time() - days * 86400
+                os.utime(summary, (stamp, stamp))
+                result = self.prune(batch, *(["--apply"] if apply else []))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout), {"applied": apply, "records": count})
+                for i, row in enumerate(rows, 1):
+                    packet = batch / f"input-{i:04d}.json"
+                    report = json.loads((batch / f"result-{i:04d}.json").read_text())
+                    if days < 30 or not apply:
+                        self.assertEqual(packet.read_bytes(), original_inputs[i - 1])
+                        self.assertEqual(report, row)
+                    else:
+                        self.assertEqual(json.loads(packet.read_text()),
+                                         {"case": row["case"], "expected": row["expected"]})
+                        self.assertEqual(report, {k: v for k, v in row.items() if k not in ("answer", "error")})
+                self.assertEqual(summary.read_bytes(), summary_bytes)
+                self.assertEqual(unrelated.read_text(), '{"answer":"mine"}')
+
+    def test_incomplete_unknown_and_linked_batches_are_untouched(self):
+        proc, _ = self.measure([("a", "PASS")])
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        batch = (self.base / "out").resolve()
+        stamp = time.time() - 31 * 86400
+        os.utime(batch / "summary.json", (stamp, stamp))
+        packet = batch / "input-0001.json"
+        record = batch / "result-0001.json"
+        before = packet.read_bytes()
+        outside = batch.parent / "saved-result.json"
+        record.rename(outside)
+        self.assertEqual(self.prune(batch, "--apply").returncode, 2)
+        record.symlink_to(outside)
+        self.assertEqual(self.prune(batch, "--apply").returncode, 2)
+        self.assertTrue(record.is_symlink())
+        self.assertIn("answer", json.loads(outside.read_text()))
+        record.unlink()
+        outside.rename(record)
+        alias = batch.parent / "alias"
+        alias.symlink_to(batch.parent, target_is_directory=True)
+        self.assertEqual(self.prune(alias / "out", "--apply").returncode, 2)
+        unrelated = batch / "result-0002.json"
+        unrelated.write_text('{"answer":"unrelated"}')
+        self.assertEqual(self.prune(batch, "--apply").returncode, 2)
+        self.assertEqual(unrelated.read_text(), '{"answer":"unrelated"}')
+        self.assertEqual(packet.read_bytes(), before)
+        self.assertIn("answer", json.loads(record.read_text()))
 
     def test_repeats_and_confusion_counts_across_routes(self):
         proc, rows = self.measure([("a", "FAIL"), ("b", "PASS")], repeats=2, models=("alpha", "beta"))

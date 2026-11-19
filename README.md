@@ -53,7 +53,7 @@ An unbound repository uses `~/logbook/<repository-name>/`. Its records stay outs
 ~/logbook/my-project/
   CURRENT.md        # Goal, decisions in force, open work, next step; at most 30 lines
   LOG.md            # Append-only change and decision history
-  records/          # Contracts, handoffs, and their retained judgments
+  records/          # Contracts, handoffs, and judge decisions
 ```
 
 For a project with several repositories, explicit settings bind them to one home:
@@ -146,7 +146,7 @@ The integration selects the judge automatically. No teammates file is required. 
 
 The judge receives the contract, the handoff and the reviewed folder's Git HEAD, status and diff statistics, without file contents. It can read the supplied review files through its CLI. **Judging sends task context to the other model provider.** Local storage does not make model calls local. Choose the review scope with that in mind.
 
-Calls have a deadline. An unavailable model or failed call gives `JUDGE none`; there is no silent fallback. A FAIL goes back for correction and review by the same provider. The lead keeps the full response and execution metadata.
+Calls have a deadline. An unavailable model or failed call gives `JUDGE none`; there is no silent fallback. A FAIL goes back for correction and review by the same provider. The lead records the verdict, execution details and receipt reference. The receipt holds the masked response and becomes eligible for cleanup after 30 days. See [review record maintenance](INSTALL.md#review-record-maintenance).
 
 Fable has Read, Grep, and Glob tools only; it cannot rerun shell checks. The Codex judge uses a read-only sandbox. Provider runtime restrictions remain the provider's responsibility. Execution metadata records the request; it is not independent model attestation.
 

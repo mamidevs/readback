@@ -274,7 +274,7 @@ ACCEPTED  <yes or no> | <date> | <the reason, when no>
 ```
 
 Copy the helper's complete JUDGE line; ACCEPTED records what the acceptance rests on.
-For an outside judge, store the complete helper output before ACCEPTED, including the execution line, the receipt line and the full answer.
+Read the full outside-judge answer. Before ACCEPTED, copy the JUDGE, execution and receipt lines into the handoff. Record any finding needed to explain the decision in your own words, omitting sensitive details. The completed receipt holds the detailed answer for 30 days. Copying it into the permanent handoff would defeat that limit.
 The output records the provider, requested model, reported model when available, requested effort and execution method.
 Claude Fable receives only Read, Grep and Glob tools. It cannot rerun shell checks.
 Codex runs with its read-only sandbox. CLI settings and managed policies remain part of the trust boundary.
@@ -305,6 +305,12 @@ The helper allows a gate call without a list and checks neither the completeness
 At the limit of the rounds another reservation needs a matching authorization of the owner.
 A changed digest of the effective settings needs a matching authorization; one authorization covers both exceptions of one reservation.
 
+### Privacy and retention of review records
+
+Before writing a receipt, a round's retry files or a judge report, mask recognizable credentials. These include labeled passwords and API tokens, authorization headers, credentials in URLs and PEM private keys. Names, arbitrary confidential prose and secrets without recognizable labels or formats can still appear. The outside judge receives the contract and handoff and can read the repository. Remove sensitive material from its inputs before authorizing a call.
+
+Detailed machine records become eligible for removal 30 days after completion. These include completed receipts, their start records and manifest markers, off and skipped receipts, and the handoff, observation and answer copies used for retries. An active repository checks for expired data on judge use, at most once per day. Idle repositories and explicitly saved measurement batches can be cleaned with the commands in INSTALL.md. Pending attempts are preserved. The round ledger keeps the verdict, timestamps and accounting metadata with no automatic expiry so the retry limit survives cleanup. Contracts, handoffs, older copies in the project logbook and backups have their own lifetime.
+
 ## 5. Trace
 
 - Each LOG line cites its approval in `go` and its proof in `ref`.
@@ -312,7 +318,7 @@ A changed digest of the effective settings needs a matching authorization; one a
 - Each DEC record quotes the owner. It does not translate the quote.
 - The lead stores each CONTRACT and each HANDOFF in the place for records. One record is one file. The file name is the id.
 - A `ref` points to something that the reader can open.
-- Each stored handoff carries the judge's answer and the lead's acceptance.
+- Each stored handoff carries the judge's result, its receipt reference when available, and the lead's acceptance.
 
 ## 6. Resume
 

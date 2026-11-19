@@ -63,7 +63,7 @@ receipt    <attempt id> | no review | <validation phrase> | <path>
 receipt    none | <reason>
 ```
 
-4. Store the complete output below the handoff, including the judge's reasoning. Then add ACCEPTED. Do not change the worker's text.
+4. Keep the JUDGE, execution and receipt lines below the handoff. Summarize any finding needed for ACCEPTED without sensitive details. The completed receipt keeps the detailed answer for 30 days. Add ACCEPTED below the original worker text.
 
 ## Rules
 

@@ -148,7 +148,7 @@ Run the bundled helper relative to this skill's directory. Resolve its absolute 
 ```
 python3 <this-skill-directory>/scripts/outside_judge.py --host codex <contract file> <handoff file> <repository folder>
 ```
-The other provider reads the contract, handoff and repository files. Store the complete output.
+The other provider reads the contract, handoff and repository files.
 Fable has Read, Grep and Glob tools only. It cannot rerun shell checks.
 Do not replace an unavailable outside judge with a sub-agent of this host.
 A call that fails gives no verdict. Write `JUDGE none` and do not accept the work.
@@ -190,7 +190,7 @@ JUDGE     <PASS, FAIL or none> | <the judge> | <repo@sha or none> | <what the ju
 ACCEPTED  <yes or no> | <date> | <the reason, when no>
 ```
 
-Store the complete outside-judge output below the handoff, including its reasoning, execution line and receipt line. Do not keep only the verdict.
+Read the full answer. Store its JUDGE, execution and receipt lines below the handoff. Summarize any finding that affects ACCEPTED without sensitive details. The completed receipt keeps the detailed answer for 30 days.
 
 ```
 JUDGE      <PASS, FAIL or none> | <provider:model> | <repo@sha or none> | <note>

@@ -25,6 +25,7 @@ import time
 import uuid
 
 import readback_session
+from review_redaction import redact, redact_bytes, redact_prefix, redact_value
 
 LINEAGE = re.compile(r"CON-[0-9]{8}-[0-9]{2}")
 TIME = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z")
@@ -201,14 +202,14 @@ def read_ledger(path, identity):
         ledger = json.loads(data.decode("utf-8"))
     except (ValueError, RecursionError):
         raise RoundError(INVALID)
-    if ledger_problem(ledger, identity):
+    if ledger_problem(ledger, identity) and ledger_problem(ledger, redact_value(identity)):
         raise RoundError(INVALID)
     return ledger
 
 
 def publish(folder, path, ledger):
     """Temporary file in the folder with mode 0600, fsync, rename onto the ledger, fsync of the folder."""
-    data = (json.dumps(ledger, sort_keys=True, indent=2) + "\n").encode("ascii")
+    data = (json.dumps(redact_value(ledger), sort_keys=True, indent=2) + "\n").encode("ascii")
     temporary = os.path.join(folder, TEMPORARY + uuid.uuid4().hex)
     fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
@@ -328,6 +329,7 @@ def keep(reservation, name, data):
 
     RoundError when that fails; a partial file is removed.
     """
+    data = redact_bytes(data)
     folder = attempt_folder(reservation.folder, reservation.path, reservation.attempt_id)
     target = os.path.join(folder, name)
     try:
@@ -385,7 +387,9 @@ def earlier_section(blocks, read_head):
     at most `count` bytes of the file, or None when it cannot be read."""
     section = Section()
     for number, (line, result, path) in enumerate(blocks):
-        section.add(("\n" if number else "") + line)
+        section.add(("\n" if number else "") + redact(line))
+        if section.cut:
+            break
         if result not in ("PASS", "FAIL"):
             section.add("no answer\n")
         else:
@@ -394,7 +398,8 @@ def earlier_section(blocks, read_head):
                 section.add("not available\n")
             else:
                 text = data.decode("utf-8", errors="ignore")
-                section.add(text, len(data) > section.left)
+                truncated = len(data) > section.left
+                section.add(redact_prefix(text) if truncated else redact(text), truncated)
                 if not section.cut and not text.endswith("\n"):
                     section.add("\n")
     return section.text()
@@ -436,7 +441,7 @@ def read_kept(path):
         with open(path, "rb", buffering=0) as handle:
             data = handle.read(COMPARE_BYTES + 1)
             if len(data) <= COMPARE_BYTES:
-                return text_of(data)
+                return text_of(redact_bytes(data))
             digest = hashlib.sha256(data)
             for chunk in iter(lambda: handle.read(CHUNK), b""):
                 digest.update(chunk)
@@ -474,8 +479,8 @@ def retry_text(reservation, raw_handoff, observation):
                 number = found
                 break
         text += "\n" + head % number + "\n" + comparison(
-            kept, text_of(current), "attempt-%d/%s" % (number, name), "current/" + name)
-    return text
+            kept, text_of(redact_bytes(current)), "attempt-%d/%s" % (number, name), "current/" + name)
+    return redact(text)
 
 
 # ------------------------------------------------------------------ bounded run (D8)

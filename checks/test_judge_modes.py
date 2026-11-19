@@ -38,7 +38,8 @@ import validate_handoff  # noqa: E402
 
 REAL_GIT = shutil.which("git")
 BUNDLE_FILES = ("outside_judge.py", "review_receipt.py", "review_capture.py", "validate_handoff.py",
-                "readback_settings.py", "readback_session.py", "project_registry.py", "judge_rounds.py")
+                "readback_settings.py", "readback_session.py", "project_registry.py", "judge_rounds.py",
+                "review_redaction.py", "review_retention.py")
 AT = "2026-11-18T10:00:00Z"
 STARTED = "see the complete answer below"
 
@@ -662,6 +663,35 @@ class RouteTests(JudgeCase):
 # ----------------------------------------------------------------------------------------- RecordTests
 
 class RecordTests(JudgeCase):
+    def test_expiry_on_next_judge_use_preserves_the_fail_limit(self):
+        self.write_settings({"judge": {"max_fail_rounds": 1}})
+        original = self.run_helper(env={"FAKE_ANSWER": "FAIL Missing proof. password=fixture_value"})
+        self.assertEqual(original.word, "FAIL", original.out + original.err)
+        store = self.common / "readback"
+        rounds = self.home / "logbook" / ".readback" / "rounds"
+        receipts = list((store / "reviews").rglob("*.json"))
+        marker = next(p for p in (store / "by-manifest").rglob("*") if p.is_file())
+        payloads = list(rounds.rglob("*.txt"))
+        self.assertEqual((len(receipts), len(payloads)), (2, 3))
+        for path in receipts + payloads:
+            self.assertNotIn(b"fixture_value", path.read_bytes())
+        old = "2000-01-01T00:00:00Z"
+        for path in receipts:
+            record = json.loads(path.read_bytes())
+            record["created"] = old
+            path.write_text(json.dumps(record))
+        for path in receipts + payloads + [marker]:
+            os.utime(path, (946684800, 946684800))
+        ledger = next(rounds.glob("*.json"))
+        state = json.loads(ledger.read_bytes())
+        state["attempts"][0].update(reserved_at=old, finished_at=old)
+        ledger.write_text(json.dumps(state))
+        retry = self.run_helper()
+        self.assertIn("round limit (1 FAIL", retry.note)
+        self.assertEqual(retry.calls, [])
+        self.assertEqual(json.loads(ledger.read_bytes()), state)
+        self.assertFalse(any(p.exists() for p in receipts + payloads + [marker]))
+
     def test_the_call_object_is_in_the_started_and_the_completed_record(self):
         self.write_settings({"judge": {"mode": "each"}})
         self.write_session("claude", "sess-1", "each")

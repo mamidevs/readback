@@ -24,6 +24,10 @@ import uuid
 
 sys.dont_write_bytecode = True  # the sibling imports below must leave no .pyc file next to the helper
 try:
+    import review_redaction
+except Exception:
+    review_redaction = None
+try:
     import review_receipt
 except Exception:  # validation and the receipt need this module
     review_receipt = None
@@ -233,7 +237,7 @@ VALIDATION_HEAD = "--- STRUCTURAL VALIDATION BY THE HELPER (unparsed; the findin
 
 
 def validation_body(validation):
-    return json.dumps(validation, sort_keys=True, indent=2)
+    return json.dumps(review_redaction.redact_value(validation), sort_keys=True, indent=2)
 
 
 COVERAGE_HEAD = "--- COVERAGE LIST OF THE GATE CALL (path | sha256; read these files) ---"
@@ -473,6 +477,7 @@ def start_receipt(repo, route, rules, inputs, call=None):
     if info is None or common is None:
         return {"line": none_receipt("not a Git worktree")}
     try:
+        info["git_common_dir_sha256"] = review_receipt.sha256_hex(os.fsencode(common))
         before = review_receipt.take_capture(review_capture.capture, repo)
         sums = [review_receipt.sha256_hex(item) for item in (raw_contract, raw_handoff, rules.encode("utf-8"))]
         route_object = {"provider": route.provider, "model": route.model, "effort": route.effort,
@@ -521,13 +526,14 @@ def finish_receipt(state, repo, validation, verdict, answer, models, exit_status
 
 
 def print_result(verdict, route, where, note, receipt, answer=""):
-    where = where.replace("\n", " ").replace("\r", " ").replace("|", "_")
-    print(f"JUDGE      {verdict} | {route.provider}:{route.model} | {where} | {note}")
-    print(f"execution  {route.provider} | {route.model} | {route.effort} | cli | none")
-    print(receipt)
+    mask = review_redaction.redact
+    where = mask(where).replace("\n", " ").replace("\r", " ").replace("|", "_")
+    print(f"JUDGE      {verdict} | {route.provider}:{mask(route.model)} | {where} | {mask(note)}")
+    print(f"execution  {route.provider} | {mask(route.model)} | {mask(route.effort)} | cli | none")
+    print(mask(receipt))
     if answer:
         print()
-        print(answer, end="" if answer.endswith("\n") else "\n")
+        print(mask(answer), end="" if answer.endswith("\n") else "\n")
 
 
 def outcome(mode, tier):
@@ -570,6 +576,7 @@ def no_review_receipt(repo, result, inputs, validation, call):
     if info is None or common is None:
         return none_receipt("not a Git worktree")
     try:
+        info["git_common_dir_sha256"] = review_receipt.sha256_hex(os.fsencode(common))
         record = review_receipt.no_review_record(
             uuid.uuid4().hex, review_receipt.now_utc(), result, info,
             str(contract.resolve()), review_receipt.sha256_hex(raw_contract),
@@ -606,6 +613,11 @@ def deadline(env, settings, tier):
 
 
 def main(argv=None):
+    if review_redaction is None:
+        print("JUDGE      none | none:none | none | no verdict: the redaction module is not available")
+        print("execution  none | none | none | cli | none")
+        print(none_receipt("no provider call"))
+        return 3
     route = Route("none", "none", "none")
     where = "none"
     receipt = none_receipt("no provider call")
@@ -636,6 +648,8 @@ def main(argv=None):
         try:
             import readback_session
             import readback_settings
+            if review_receipt is not None:
+                import review_retention
         except Exception as exc:
             raise JudgeError("the settings modules are not available") from exc
         try:
@@ -643,6 +657,8 @@ def main(argv=None):
             loaded = readback_settings.load(project["home"])
         except readback_settings.SettingsError as exc:
             raise JudgeError("settings: " + exc.code) from exc
+        if review_receipt is not None:
+            review_retention.maybe_prune(project)
         settings = loaded["settings"]
         session_id = readback_session.session_id_from_env(host, env)
         mode, mode_source = settings["judge"]["mode"], {"kind": "project", "settings_source": loaded["source"]}
@@ -741,10 +757,10 @@ def main(argv=None):
                         answer = answer_path.read_text(encoding="utf-8")
                     except (OSError, UnicodeError) as exc:
                         raise ProviderError("Codex returned no readable answer") from exc
-                kept = answer.encode("utf-8", "replace")
-                if len(kept) > KEEP_LIMIT:
+                if len(answer.encode("utf-8", "replace")) > KEEP_LIMIT:
                     raise ProviderError("the answer is too large to keep")
                 verdict = first_verdict(answer)
+                answer = review_redaction.redact(answer)
             except JudgeError as error:
                 failure = error
                 try:
@@ -759,7 +775,7 @@ def main(argv=None):
                     judge_rounds.finish(reservation, "none")
                 raise
             with contextlib.suppress(judge_rounds.RoundError):
-                judge_rounds.keep(reservation, "answer.txt", kept)
+                judge_rounds.keep(reservation, "answer.txt", answer.encode("utf-8", "replace"))
             try:
                 judge_rounds.finish(reservation, verdict)
             except judge_rounds.RoundError as exc:
@@ -776,7 +792,8 @@ def main(argv=None):
         return 0
     except (JudgeError, KeyboardInterrupt, InterruptedError) as exc:
         reason = str(exc) if isinstance(exc, JudgeError) else "the judge was interrupted"
-        print_result("none", route, where, "no verdict: " + reason.replace("\n", " "), receipt, body)
+        note = "no verdict: " + review_redaction.redact(reason).replace("\n", " ")
+        print_result("none", route, where, note, receipt, body)
         return 3
 
 
