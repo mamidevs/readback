@@ -192,3 +192,13 @@ No package exists for other CLIs. A CLI that reads Agent Skills can try `portabl
 ## Optional shared project memory
 
 Several code repositories can share one local project logbook without changing their working directories. See [shared projects](docs/shared-projects.md) and [project identity](docs/project-identity.md). Install the updated portable lead skill and its bundled scripts together. Existing unbound repositories retain the default behavior. A marked repository with a missing or invalid binding stops instead of creating a second logbook.
+
+## macOS menu bar
+
+On a Mac with macOS 14 or later and the Apple Command Line Tools, build and open the local app from this checkout:
+
+```sh
+app/menu-bar/build.sh && open app/menu-bar/build/Readback.app
+```
+
+Click the Readback icon, choose a project, then choose when its independent judge should run. Claude Code and Codex read the saved project default. A session with its own mode override keeps that override. The app uses the macOS system Python and the settings reader bundled with the build. To build again alongside an existing copy, pass a new output path ending in `.app`.
