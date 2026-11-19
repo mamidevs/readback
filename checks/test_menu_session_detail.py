@@ -92,6 +92,35 @@ class SessionDetailTests(unittest.TestCase):
         self.assertEqual(self.detail("claude", "legacy"), EMPTY)
         self.assertEqual(self.detail("claude", key="../../something"), EMPTY)
 
+    def test_code_mode_reports_only_observed_requests_and_matched_results(self):
+        log = self.claude_log()
+        base = {"sessionId": self.key, "cwd": self.cwd, "timestamp": TIME}
+
+        def request(call_id, name, nested=False):
+            block = {"type": "tool_use", "id": call_id, "name": name, "input": {"code": SECRET}}
+            return dict(base, type="assistant", isVirtual=nested, madeBy="other" if nested else "model",
+                        message={"model": "virtual-model" if nested else "claude-sonnet-5-5", "content": [block]})
+
+        def result(call_id, nested=False, error=False):
+            block = {"type": "tool_result", "tool_use_id": call_id, "is_error": error, "content": SECRET}
+            return dict(base, type="user", isVirtual=nested, message={"content": [block]})
+
+        append(log, request("toolu_0", "REPL"), result("toolu_0", error=True),
+               request("toolu_1", "REPL"), dict(result("toolu_1"), toolUseResult={"toolsUsed": ["Read", "Write"]}),
+               request("repl_a", "Read", True), request("repl_b", "Read", True),
+               result("repl_b", True), result("repl_a", True),
+               request("repl_c", "Read", True), dict(result("repl_c", True), sessionId=str(uuid.uuid4())),
+               result("repl_missing", True))
+        detail = self.detail("claude")
+        self.assertEqual(detail["model"], "claude-sonnet-5-5")
+        self.assertEqual([event["label"] for event in reversed(detail["events"])],
+                         ["Code Mode çağrısı", "Code Mode hata bildirdi", "Code Mode çağrısı", "Code Mode tamamlandı",
+                          "Code Mode · Dosya okuma isteği", "Code Mode · Dosya okuma isteği",
+                          "Code Mode · Dosya okundu", "Code Mode · Dosya okundu",
+                          "Code Mode · Dosya okuma isteği", "Araç sonucu alındı"])
+        self.assertNotIn(SECRET, json.dumps(detail))
+        self.assertEqual(self.detail("claude", "legacy"), EMPTY)
+
     def test_codex_rejects_symlinks_escape_header_mismatch_and_missing_records(self):
         log = self.codex_log()
         original = log.read_bytes()

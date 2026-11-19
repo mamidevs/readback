@@ -140,12 +140,41 @@ def codex_actions(row):
     return None, []
 
 
-def claude_actions(row):
+def claude_tool_request(part, virtual, pending):
+    name = part.get("name")
+    call_id = part.get("id")
+    label = tool_label(name, part.get("input"))
+    if name == "REPL" and not virtual:
+        label = "Code Mode çağrısı"
+    elif virtual and isinstance(call_id, str) and call_id.startswith("repl_"):
+        label = "Code Mode · " + label
+    else:
+        return label
+    if isinstance(call_id, str) and call_id:
+        pending[(virtual, call_id)] = name
+    return label
+
+
+def claude_tool_result(part, virtual, pending):
+    call_id = part.get("tool_use_id")
+    name = pending.pop((virtual, call_id), None) if isinstance(call_id, str) else None
+    error = part.get("is_error") is True
+    if name == "REPL" and not virtual:
+        return "Code Mode hata bildirdi" if error else "Code Mode tamamlandı"
+    if name == "Read" and not error:
+        return "Code Mode · Dosya okundu"
+    label = "Araç hata bildirdi" if error else "Araç sonucu alındı"
+    return "Code Mode · " + label if name else label
+
+
+def claude_actions(row, pending):
     message = row.get("message")
     if not isinstance(message, dict):
         return None, []
     kind = row.get("type")
-    model = model_id(message.get("model")) if kind == "assistant" else None
+    virtual = row.get("isVirtual") is True
+    author = kind == "assistant" and not virtual and row.get("madeBy") != "other"
+    model = model_id(message.get("model")) if author else None
     content = message.get("content")
     if not isinstance(content, list):
         return model, []
@@ -155,11 +184,11 @@ def claude_actions(row):
             continue
         item = part.get("type")
         if kind == "assistant" and item == "tool_use":
-            labels.append(tool_label(part.get("name"), part.get("input")))
-        elif kind == "assistant" and item == "text":
+            labels.append(claude_tool_request(part, virtual, pending))
+        elif author and item == "text":
             labels.append("Model yanıt yazdı")
         elif kind == "user" and item == "tool_result":
-            labels.append("Araç hata bildirdi" if part.get("is_error") is True else "Araç sonucu alındı")
+            labels.append(claude_tool_result(part, virtual, pending))
     return model, labels
 
 
@@ -216,13 +245,15 @@ def read_detail(source, host, session, matches):
     if offset:
         # The extra byte tells us whether the tail starts at a record boundary.
         tail = tail.split(b"\n", 1)[1] if b"\n" in tail else b""
+    # Correlate only observed requests and results in this snapshot of the selected session.
+    pending = {}
     # A writer can still be appending the final record.
     for line in tail.split(b"\n")[:-1]:
         row = object_line(line)
         if host == "claude":
             if row.get("sessionId") != session or not project_cwd(row.get("cwd")):
                 continue
-            name, actions = claude_actions(row)
+            name, actions = claude_actions(row, pending)
         else:
             name, actions = codex_actions(row)
         model = name or model
