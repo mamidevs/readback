@@ -27,9 +27,25 @@ enum JudgeMode: String, Codable, CaseIterable {
     }
 }
 
+struct JudgeRoute: Decodable, Equatable {
+    let model: String
+    let effort: String
+}
+
+struct ProjectSession: Decodable, Hashable {
+    let id: String
+    let host: String
+    let status: String
+}
+
 struct BridgeResponse: Decodable {
     var projects: [Project]?
     var mode: JudgeMode?
+    var routes: [String: [String: JudgeRoute]]?
+    var efforts: [String: [String]]?
+    var unavailable: [String]?
+    var truncated: Bool?
+    var sessions: [ProjectSession]?
 }
 
 struct SettingsBridge {
@@ -57,6 +73,15 @@ final class PanelModel: ObservableObject {
     @Published private(set) var mode: JudgeMode?
     @Published private(set) var busy = false
     @Published private(set) var message: String?
+
+    @Published private(set) var routes: [String: [String: JudgeRoute]] = [:]
+    @Published private(set) var efforts: [String: [String]] = [:]
+    @Published private(set) var sessions: [ProjectSession] = []
+    @Published private(set) var sessionsBusy = false
+    @Published private(set) var sessionsMessage: String?
+    private var watchingSessions = false
+    private var sessionsRevision = 0
+    private let sessionQueue = DispatchQueue(label: "readback.session.list", qos: .utility)
 
     private let preferences: UserDefaults
     private let bridge: SettingsBridge
@@ -91,6 +116,7 @@ final class PanelModel: ObservableObject {
         selection = nil
         mode = nil
         projects = []
+        clearProjectDetails()
         request(["projects"], failure: "Projeler okunamadı. Paneli yeniden açıp deneyin.") { response in
             guard let list = response.projects else { throw CocoaError(.coderReadCorrupt) }
             self.projects = list
@@ -107,10 +133,12 @@ final class PanelModel: ObservableObject {
         guard projects.contains(where: { $0.id == id }) else { return }
         selection = id
         mode = nil
+        clearProjectDetails()
+        if watchingSessions { refreshSessions() }
         preferences.set(id, forKey: lastProjectKey)
         request(["get", id], failure: "Hakem ayarı okunamadı. Projeyi yeniden seçin.") { response in
             guard let saved = response.mode else { throw CocoaError(.coderReadCorrupt) }
-            self.mode = saved
+            self.applySettings(response, mode: saved)
         }
     }
 
@@ -118,7 +146,69 @@ final class PanelModel: ObservableObject {
         guard let id = selection, let saved = mode, saved != value, !busy else { return }
         request(["set", id, value.rawValue], failure: "Hakem ayarı kaydedilemedi. Yeniden deneyin.") { response in
             guard response.mode == value else { throw CocoaError(.coderReadCorrupt) }
-            self.mode = value
+            self.applySettings(response, mode: value)
+        }
+    }
+
+    private func applySettings(_ response: BridgeResponse, mode: JudgeMode) {
+        self.mode = mode
+        routes = response.routes ?? [:]
+        efforts = response.efforts ?? [:]
+    }
+
+    func saveRoute(host: String, tier: String, model: String, effort: String) {
+        guard let project = selection, let mode, mode != .off, !busy,
+              tier == "gate" || (tier == "step" && mode == .each),
+              efforts[host]?.contains(effort) == true else { return }
+        request(["set-route", project, host, tier, model, effort],
+                failure: "Hakem ayarları kaydedilemedi. Model adını kontrol edip yeniden deneyin.") { response in
+            guard let saved = response.routes?[host]?[tier], let currentMode = response.mode,
+                  saved.model == model, saved.effort == effort else { throw CocoaError(.coderReadCorrupt) }
+            self.applySettings(response, mode: currentMode)
+        }
+    }
+
+    private func clearProjectDetails() {
+        routes = [:]
+        efforts = [:]
+        sessionsRevision += 1
+        sessions = []
+        sessionsMessage = nil
+        sessionsBusy = false
+    }
+
+    func watchSessions(_ enabled: Bool) {
+        watchingSessions = enabled
+        if enabled { refreshSessions() }
+    }
+
+    func refreshSessions() {
+        guard let project = selection else { return }
+        sessionsRevision += 1
+        let version = sessionsRevision
+        sessionsBusy = true
+        sessionsMessage = nil
+        sessionQueue.async { [bridge] in
+            let result = Result { try bridge.run(["sessions", project]) }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.selection == project, self.sessionsRevision == version else { return }
+                self.sessionsBusy = false
+                do {
+                    let response = try result.get()
+                    guard let found = response.sessions else { throw CocoaError(.coderReadCorrupt) }
+                    self.sessions = found
+                    let unavailable = (response.unavailable ?? []).map { $0 == "claude" ? "Claude Code" : "Codex" }
+                    var notes = [String]()
+                    if !unavailable.isEmpty {
+                        notes.append("\(unavailable.joined(separator: ", ")) oturumları kısmen okunabildi veya kullanılamıyor.")
+                    }
+                    if response.truncated == true { notes.append("Oturum listesinin bir bölümü gösteriliyor.") }
+                    self.sessionsMessage = notes.isEmpty ? nil : notes.joined(separator: " ")
+                } catch {
+                    self.sessions = []
+                    self.sessionsMessage = "Oturumlar okunamadı."
+                }
+            }
         }
     }
 }

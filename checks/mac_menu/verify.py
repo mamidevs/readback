@@ -68,7 +68,8 @@ class Fixture:
 @contextmanager
 def running(binary, home, appearance):
     home = Path(home).resolve(strict=True)
-    env = dict(os.environ, HOME=str(home), CFFIXED_USER_HOME=str(home))
+    env = dict(os.environ, HOME=str(home), CFFIXED_USER_HOME=str(home),
+               CODEX_HOME=str(home / ".codex"), CLAUDE_CONFIG_DIR=str(home / ".claude"))
     arguments = [binary, "-AppleInterfaceStyle", appearance, "-AppleInterfaceStyleSwitchesAutomatically", "NO",
                  "-NSRequiresAquaSystemAppearance", "YES" if appearance == "Light" else "NO",
                  "-AppleKeyboardUIMode", "3"]

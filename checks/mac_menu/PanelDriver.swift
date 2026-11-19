@@ -65,7 +65,7 @@ func run() throws {
     }
     let app = AXUIElementCreateApplication(pid)
     _ = AXUIElementSetMessagingTimeout(app, 1)
-    let query = args.dropFirst(2).joined(separator: " ")
+    let query = args.count > 2 ? args[2] : ""
     func matches(_ element: AXUIElement) -> Bool {
         if query.hasPrefix("rb.") { return text(element, "AXIdentifier") == query }
         return ["AXTitle", "AXDescription", "AXValue"].contains { text(element, $0) == query }
@@ -109,6 +109,40 @@ func run() throws {
         print(number)
     case "dump":
         print(tree(app).map(describe).joined(separator: "\n"))
+    case "value", "set-text":
+        var target: AXUIElement?
+        try wait(app, query) { elements in
+            target = elements.first(where: matches)
+            return target != nil
+        }
+        guard let target else { throw DriverError("Missing field " + query) }
+        if args[1] == "value" { print(text(target, "AXValue")); return }
+        guard args.count == 4 else { throw DriverError("Expected a field and a value") }
+        let result = AXUIElementSetAttributeValue(target, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+        guard result == .success else { throw DriverError("Cannot focus text field " + query) }
+        try wait(app, "text editor focus") { elements in
+            elements.contains { matches($0) && attribute($0, "AXFocused") as? Bool == true }
+        }
+        let source = CGEventSource(stateID: .combinedSessionState)
+        let units = Array(args[3].utf16)
+        for selectAll in [true, false] {
+            for down in [true, false] {
+                guard let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: down) else {
+                    throw DriverError("Cannot enter text")
+                }
+                if selectAll { event.flags = .maskCommand }
+                else { event.keyboardSetUnicodeString(stringLength: units.count, unicodeString: units) }
+                event.postToPid(pid)
+                Thread.sleep(forTimeInterval: 0.04)
+            }
+        }
+        try wait(app, "edited value") { elements in
+            elements.contains { matches($0) && text($0, "AXValue") == args[3] }
+        }
+    case "menu-closed":
+        try wait(app, "menu dismissal") { elements in
+            !elements.contains { text($0, "AXRole") == "AXMenuItem" }
+        }
     case "selected":
         try wait(app, "confirmed selection " + query) { elements in
             elements.contains { matches($0) && text($0, "AXValue") == "Seçili" && attribute($0, "AXEnabled") as? Bool != false }

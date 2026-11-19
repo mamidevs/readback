@@ -136,9 +136,32 @@ def _fill(base, raw):
     return {k: _fill(v, raw.get(k, {})) if type(v) is dict else raw.get(k, v) for k, v in base.items()}
 
 
-def load(home):
+def _legacy_routes(table):
+    """Explicit provider routes applied by outside_judge before a project settings file exists."""
+    routes = {}
+    for host in ("claude", "codex"):
+        try:
+            route = outside_judge.select_route(host, Path(table))
+        except outside_judge.JudgeError as exc:
+            raise SettingsError("INVALID_TABLE", f"{table}: {exc}") from exc
+        if route.source == "table":
+            routes[route.provider] = {tier: {"model": route.model, "effort": route.effort}
+                                      for tier in ("step", "gate")}
+    return routes
+
+
+def _initial_settings(legacy_table):
+    obj = {"schema_version": 1}
+    if legacy_table is not None:
+        routes = _legacy_routes(legacy_table)
+        if routes:
+            obj["judge"] = {"routes": routes}
+    return obj
+
+
+def load(home, *, legacy_table=None):
     obj = _read(home)
-    settings = _fill(DEFAULTS, {} if obj is None else obj)
+    settings = _fill(DEFAULTS, _initial_settings(legacy_table) if obj is None else obj)
     return {"settings": settings, "source": "defaults" if obj is None else "file",
             "path": str(Path(home) / "settings.json"), "digest": digest(settings)}
 
@@ -184,12 +207,12 @@ def _publish(home, obj):
         raise SettingsError("WRITE_FAILED", f"{target}: {exc}") from exc
 
 
-def update(home, key, value):
+def update(home, key, value, *, legacy_table=None):
     path = str(Path(home) / "settings.json")
     with _locked(home):
         obj = _read(home)
         if obj is None:
-            obj = {"schema_version": 1}
+            obj = _initial_settings(legacy_table)
         *parents, leaf = key.split(".")
         node = obj
         for part in parents:
@@ -220,16 +243,10 @@ def resolve(cwd, host, registry=None, logbook=None):
 
 def migrate_teammates(home, table, write=False):
     """Map the legacy judge table to settings leaves; with write, fill only the leaves that are missing."""
-    mapping = {}
-    for host in ("claude", "codex"):
-        try:
-            route = outside_judge.select_route(host, Path(table))
-        except outside_judge.JudgeError as exc:
-            raise SettingsError("INVALID_TABLE", f"{table}: {exc}") from exc
-        if route.source == "table":
-            for tier in ("step", "gate"):
-                mapping[f"judge.routes.{route.provider}.{tier}.model"] = route.model
-                mapping[f"judge.routes.{route.provider}.{tier}.effort"] = route.effort
+    mapping = {f"judge.routes.{provider}.{tier}.{leaf}": value
+               for provider, tiers in _legacy_routes(table).items()
+               for tier, pair in tiers.items()
+               for leaf, value in pair.items()}
     written = []
     if write:
         path = str(Path(home) / "settings.json")

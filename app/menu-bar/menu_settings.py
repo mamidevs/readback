@@ -10,6 +10,7 @@ import sys
 import time
 from contextlib import nullcontext
 
+import outside_judge
 import project_registry as registry
 import readback_settings as settings
 
@@ -57,12 +58,42 @@ def catalog(book):
     return result
 
 
-def access(project, binding, mode):
+# The UI chooses a lead host. The settings file names the opposite, judging provider.
+EFFORTS = {
+    "claude": ("low", "medium", "high", "xhigh", "max"),
+    "codex": ("low", "medium", "high", "xhigh", "max", "ultra"),
+}
+
+
+def panel_settings(args, book):
+    table = os.environ.get("READBACK_TEAMMATES", str(book / "TEAMMATES.md"))
+    if args.command == "set-route":
+        provider = outside_judge.DEFAULTS[args.host].provider
+        if args.effort not in EFFORTS[provider]:
+            raise settings.SettingsError("INVALID_SETTINGS", "Unsupported judge effort")
+        key = f"judge.routes.{provider}.{args.tier}"
+        loaded = settings.update(".", key, {"model": args.model, "effort": args.effort}, legacy_table=table)
+    elif args.command == "set":
+        loaded = settings.update(".", "judge.mode", args.mode, legacy_table=table)
+    else:
+        loaded = settings.load(".", legacy_table=table)
+    judge = loaded["settings"]["judge"]
+    return {
+        "mode": judge["mode"],
+        "routes": {host: judge["routes"][route.provider] for host, route in outside_judge.DEFAULTS.items()},
+        "efforts": {host: EFFORTS[route.provider] for host, route in outside_judge.DEFAULTS.items()},
+    }
+
+
+def access(project, binding, args, book):
     home = Path(project["location"])
     with registry._directory_fd(home) as fd:
         info = os.fstat(fd)
         registry.require(identifier(home, binding, info.st_dev, info.st_ino) == project["id"],
                          "The selected project changed", "IDENTITY_MISMATCH")
+        if args.command == "sessions":
+            import menu_sessions
+            return menu_sessions.for_project(project, binding, book)
         # This helper serves exactly one command per process. Pin the settings
         # call to the opened home even if its path is renamed during the call.
         os.fchdir(fd)
@@ -73,8 +104,7 @@ def access(project, binding, mode):
                 continue
             registry.require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1,
                              "Invalid settings file", "INVALID_SETTINGS")
-        loaded = settings.load(".") if mode is None else settings.update(".", "judge.mode", mode)
-        return {"mode": loaded["settings"]["judge"]["mode"]}
+        return panel_settings(args, book)
 
 
 def main():
@@ -85,12 +115,19 @@ def main():
     put = commands.add_parser("set")
     put.add_argument("id")
     put.add_argument("mode", choices=("off", "gate", "each"))
+    route = commands.add_parser("set-route")
+    route.add_argument("id")
+    route.add_argument("host", choices=outside_judge.DEFAULTS)
+    route.add_argument("tier", choices=("step", "gate"))
+    route.add_argument("model")
+    route.add_argument("effort")
+    commands.add_parser("sessions").add_argument("id")
     args = parser.parse_args()
     book = Path.home() / "logbook"
     control = book / ".readback"
     try:
         lock = nullcontext()
-        if args.command == "set" and control.is_dir():
+        if args.command in ("set", "set-route") and control.is_dir():
             lock = registry._lock(control / "projects.lock", time.monotonic() + 5)
         with lock:
             items = catalog(book)
@@ -100,7 +137,7 @@ def main():
             else:
                 registry.require(args.id in items, "The selected project is unavailable", "NOT_FOUND")
                 project, binding = items[args.id]
-                answer = access(project, binding, getattr(args, "mode", None))
+                answer = access(project, binding, args, book)
         print(json.dumps(answer))
         return 0
     except (settings.SettingsError, registry.RegistryError, OSError) as exc:

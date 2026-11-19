@@ -1,9 +1,17 @@
 import AppKit
 import SwiftUI
 
-struct ProjectPicker: NSViewRepresentable {
-    let projects: [Project]
+struct PickerOption: Equatable {
+    let id: String
+    let title: String
+}
+
+struct PanelPicker: NSViewRepresentable {
+    let options: [PickerOption]
     let selection: String?
+    let label: String
+    let identifier: String
+    var placeholder: String? = nil
     let select: (String) -> Void
 
     final class Coordinator: NSObject {
@@ -13,50 +21,61 @@ struct ProjectPicker: NSViewRepresentable {
             if let id = sender.selectedItem?.representedObject as? String { select(id) }
         }
     }
-
     func makeCoordinator() -> Coordinator { Coordinator(select: select) }
 
     func makeNSView(context: Context) -> NSPopUpButton {
         let button = NSPopUpButton(frame: .zero, pullsDown: false)
         button.target = context.coordinator
         button.action = #selector(Coordinator.picked(_:))
-        button.setAccessibilityLabel("Proje")
-        button.setAccessibilityIdentifier("rb.project")
+        button.setAccessibilityLabel(label)
+        button.setAccessibilityIdentifier(identifier)
         button.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        button.autoenablesItems = false
         return button
     }
 
     func updateNSView(_ button: NSPopUpButton, context: Context) {
         context.coordinator.select = select
         let ids = button.itemArray.compactMap { $0.representedObject as? String }
-        let counts = Dictionary(grouping: projects, by: \.name)
-        let titles = projects.map { project in
-            counts[project.name]?.count == 1 ? project.name : "\(project.name) — \(project.location)"
-        }
-        if button.numberOfItems == 0 || ids != projects.map(\.id) || titles != Array(button.itemTitles.dropFirst()) {
+        let titles = [placeholder].compactMap { $0 } + options.map(\.title)
+        if ids != options.map(\.id) || button.itemTitles != titles {
             button.removeAllItems()
-            button.addItem(withTitle: "Proje seç")
-            button.item(at: 0)?.isEnabled = false
-            button.autoenablesItems = false
-            for (project, title) in zip(projects, titles) {
-                button.addItem(withTitle: title)
-                button.lastItem?.representedObject = project.id
+            if let placeholder {
+                button.addItem(withTitle: placeholder)
+                button.lastItem?.isEnabled = false
+            }
+            for option in options {
+                button.addItem(withTitle: option.title)
+                button.lastItem?.representedObject = option.id
             }
         }
-        let index = projects.firstIndex { $0.id == selection }
-        button.selectItem(at: index.map { $0 + 1 } ?? 0)
-        button.isEnabled = !projects.isEmpty
+        let offset = placeholder == nil ? 0 : 1
+        let index = options.firstIndex { $0.id == selection }
+        button.selectItem(at: index.map { $0 + offset } ?? (placeholder == nil ? -1 : 0))
+        button.isEnabled = !options.isEmpty
     }
 }
 
 struct SettingsPanel: View {
     @ObservedObject var model: PanelModel
+    @State private var section: PanelSection?
+
+    private enum PanelSection { case routes, sessions }
+
+    private var projectOptions: [PickerOption] {
+        let counts = Dictionary(grouping: model.projects, by: \.name)
+        return model.projects.map { project in
+            PickerOption(id: project.id, title: counts[project.name]?.count == 1
+                         ? project.name : "\(project.name) — \(project.location)")
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 7) {
                 Text("Proje").font(.headline)
-                ProjectPicker(projects: model.projects, selection: model.selection, select: model.select)
+                PanelPicker(options: projectOptions, selection: model.selection, label: "Proje",
+                            identifier: "rb.project", placeholder: "Proje seç", select: model.select)
                     .frame(maxWidth: .infinity)
                     .frame(height: 26)
             }
@@ -77,6 +96,24 @@ struct SettingsPanel: View {
                 }
             }
 
+            if model.selection != nil {
+                VStack(alignment: .leading, spacing: 4) {
+                    Divider().padding(.bottom, 4)
+                    if let mode = model.mode, mode != .off {
+                        sectionButton("Hakem modelleri", icon: "slider.horizontal.3", kind: .routes, id: "rb.routes")
+                        if section == .routes {
+                            RouteEditor(model: model)
+                                .id(model.selection)
+                                .padding(.vertical, 4)
+                        }
+                    }
+                    sectionButton("Proje oturumları", icon: "rectangle.stack", kind: .sessions, id: "rb.sessions")
+                    if section == .sessions {
+                        SessionList(model: model)
+                    }
+                }
+            }
+
             if let message = model.message {
                 Text(message)
                     .font(.callout)
@@ -86,8 +123,31 @@ struct SettingsPanel: View {
             }
         }
         .padding(18)
-        .frame(width: 300, alignment: .leading)
+        .frame(width: 340, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func sectionButton(_ title: String, icon: String, kind: PanelSection, id: String) -> some View {
+        let expanded = section == kind
+        return Button {
+            section = expanded ? nil : kind
+            model.watchSessions(section == .sessions)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: icon).frame(width: 16).foregroundStyle(.secondary)
+                Text(title)
+                Spacer()
+                Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 3)
+            .frame(height: 28)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(title)
+        .accessibilityValue(expanded ? "Açık" : "Kapalı")
+        .accessibilityIdentifier(id)
     }
 
     private func modeButton(_ mode: JudgeMode) -> some View {
