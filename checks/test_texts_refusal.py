@@ -88,5 +88,40 @@ class InstallTests(unittest.TestCase):
             self.assertIsNone(re.search(word, "\n".join(body), re.I), word)
 
 
+    def body(self):
+        ls, start, end = self.section()
+        return "\n".join(ls[start + 1:end])
+
+    def test_point_1_the_host_can_refuse_before_the_helper_starts(self):
+        body = self.body()
+        self.assertIn("before the helper starts", body)
+        for part in ("the contract", "the handoff", "read access to the repository"):
+            self.assertIn(part, body)
+
+    def test_point_2_the_lead_shows_the_owner_three_things(self):
+        body = self.body()
+        for part in ("The lead shows the owner the host's reason",
+                     "The lead shows the owner the provider that would judge",
+                     "The lead shows the owner what the call would send"):
+            self.assertIn(part, body)
+
+    def test_point_3_the_judge_none_line_and_the_open_acceptance(self):
+        body = self.body()
+        self.assertIn("`JUDGE none`", body)
+        self.assertIn("The acceptance stays open until a judge call gives a verdict", body)
+
+    def test_point_5_no_other_way_and_no_judge_of_the_own_host(self):
+        body = self.body()
+        self.assertIn("The lead does not send the content another way", body)
+        self.assertIn("The lead does not replace the outside judge with a judge of its own host", body)
+
+class AmendmentTests(unittest.TestCase):
+    def test_amendment_18_records_the_change(self):
+        text = read("AMENDMENT-18.md")
+        self.assertEqual(text.split("\n")[0], "# Amendment 18")
+        for name in ("host refusal", "INSTALL.md", STYLE, PROTOCOL, SKILL):
+            self.assertIn(name, text)
+
+
 if __name__ == "__main__":
     unittest.main()
