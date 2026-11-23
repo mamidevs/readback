@@ -117,6 +117,10 @@ ACC-4  If <unwanted condition>, then the <thing> shall <response>.  Check: ...
 Out of scope: <what the worker must not change>
 ```
 
+Put the complete contract in the worker's prompt, or the path of its record.
+The complete contract holds its statements, their checks and the out-of-scope line.
+A contract id alone delivers no statement.
+
 The contract is the limit of the work. The worker adds nothing to it.
 A change to the scope that the owner approved needs a GO.
 

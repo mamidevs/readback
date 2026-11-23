@@ -20,6 +20,7 @@ READBACK  task: <what I will do> | limits: <what I must not change> | done when:
 Write the readback in the `readback` key of the handoff.
 If the lead asks for the readback only, return the readback and change no file. Write no handoff.
 Without a contract, write `done when:` in plain words and `contract: none`.
+If the task names a contract and you cannot read its statements, return UNABLE. Name the contract. Change no file.
 
 ## While you work
 
