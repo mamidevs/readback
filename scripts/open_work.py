@@ -18,7 +18,7 @@ The ids of a conflict: `decision` and `invalid-note` and `unreadable` the one re
 record that holds the value, then the value; `contract-mismatch` the note, then the handoff;
 `withdrawn-and-closed` the withdrawal note, then the contract.
 
-A record is a file `<id>.md` directly in the folder, with the kind CON, HND or NOTE. Each CRLF in a record is read as LF; a lone CR stays. The script
+A record is a file `<id>.md` directly in the folder, with the kind CON, HND or NOTE. Each CR run before an LF in a record is read as LF; a CR not before an LF stays. The script
 reads no other file, changes no record and writes no file. Every list is sorted by id (string
 order); two runs on the same folder print the same bytes. It reads form and links; it does not
 show that a verdict is right.
@@ -82,10 +82,16 @@ def read_folder(folder):
             continue
         try:
             with open(path, "rb") as handle:
-                records[name[:-3]] = handle.read().decode("utf-8").replace("\r\n", "\n")
+                records[name[:-3]] = handle.read().decode("utf-8")
         except (OSError, UnicodeDecodeError):
             records[name[:-3]] = None
     return records
+
+
+def lf(text):
+    """The text with each line end of CR characters and LF read as LF; a CR not before an LF stays.
+    Applying it twice gives the same text as applying it once."""
+    return re.sub(r"\r+\n", "\n", text)
 
 
 def kind_of(record_id):
@@ -94,7 +100,7 @@ def kind_of(record_id):
 
 def embedded_lines(text):
     """The last JUDGE line and the last ACCEPTED line of a record, each None when absent."""
-    lines = text.split("\n")
+    lines = lf(text).split("\n")
     for i, line in enumerate(lines):
         if line.rstrip(" \t") == LEAD_MARKER:
             lines = lines[i + 1:]
@@ -120,7 +126,7 @@ def decision_of_line(line):
 
 def first_line(text):
     """The first line that is not blank, after the envelope line."""
-    lines = text.split("\n")
+    lines = lf(text).split("\n")
     for i, line in enumerate(lines):
         if line.strip():
             if line.startswith("<!-- readback ") and line.rstrip().endswith("-->"):
@@ -134,7 +140,7 @@ def first_line(text):
 
 def link_values(text):
     """The link keys (contract_id, replaces) of a handoff, empty ones left out."""
-    parsed = validate_handoff.parse_handoff(text)
+    parsed = validate_handoff.parse_handoff(lf(text))
     if not parsed["ok"]:
         return {}
     links = {}
@@ -146,6 +152,7 @@ def link_values(text):
 
 
 def analyse(records):
+    records = {rid: (None if text is None else lf(text)) for rid, text in records.items()}
     ids = sorted(records)
     conflicts = []
     counts = {"CON": 0, "HND": 0, "NOTE": 0}
