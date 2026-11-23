@@ -160,6 +160,19 @@ class FrameTests(unittest.TestCase):
         text = SPACED.replace("changes   none\n", MARKER + "\nJUDGE notes\nchanges   none\n")
         self.assertIs(vh.validate(CONTRACT, text)["valid"], False)
 
+    def test_b03_a_contract_is_read_past_a_lead_marker_line_as_at_main(self):
+        # At main 3d6b4c3 the marker line is a column-0 line that is no key (V1 unresolved) and the
+        # ACC-3 line below it is read, so the handoff that lacks a status for ACC-3 has two defects.
+        contract = CONTRACT + MARKER + "\nACC-3  The tool shall stay.   Check: sh c.sh\n"
+        result = vh.validate(contract, SPACED)
+        self.assertIs(result["valid"], False)
+        self.assertEqual(
+            [(f["rule"], f["acc"], f["level"], f["message"]) for f in result["findings"]],
+            [("V1", None, "unresolved", "line at column 0 is not a key: %r" % MARKER),
+             ("V3", "ACC-3", "defect", "ACC-3 has no status"),
+             ("V5", "ACC-3", "defect", "state DONE but ACC-3 has no status")])
+        self.assertEqual(vh.parse_contract(contract)["statements"][-1]["id"], "ACC-3")
+
     # envelope outside the first line
     def test_a05_a_second_envelope_line_is_reported_as_today(self):
         result = vh.validate(CONTRACT, ENVELOPE + ENVELOPE + SPACED)
