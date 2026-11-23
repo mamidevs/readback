@@ -252,11 +252,22 @@ def index_directory(home_fd, create=False):
 
 @contextlib.contextmanager
 def publication_lock(directory_fd):
-    fd = os.open("project-index.lock", os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600, dir_fd=directory_fd)
+    # One deadline bounds the open retries and the wait for the file lock.
+    deadline = time.monotonic() + 5
+    while True:
+        try:
+            fd = os.open("project-index.lock", os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600, dir_fd=directory_fd)
+            break
+        except FileNotFoundError:
+            # Measured on macOS 27.0: two processes that create the same new file name below
+            # one directory descriptor get one FileNotFoundError in 40 of 40 trials; a path-based
+            # open shows none in 40. This site was not seen failing in use.
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.02)
     try:
         info = os.fstat(fd)
         require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1, "Invalid index lock")
-        deadline = time.monotonic() + 5
         while True:
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)

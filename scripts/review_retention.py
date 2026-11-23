@@ -285,8 +285,15 @@ def _run(project, apply, daily):
                 if not sweep.rounds(rounds):
                     return sweep.counts
                 rounds = None
-            fd = os.open(stamp, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600,
-                         dir_fd=clock_folder)
+            try:
+                fd = os.open(stamp, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600,
+                             dir_fd=clock_folder)
+            except FileNotFoundError:
+                # Measured on macOS 27.0: two processes that create the same new file name below
+                # one directory descriptor get one FileNotFoundError in 40 of 40 trials; a
+                # path-based open shows none in 40. This site was not seen failing in use.
+                fd = os.open(stamp, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600,
+                             dir_fd=clock_folder)
             stack.callback(os.close, fd)
             info = os.fstat(fd)
             if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
