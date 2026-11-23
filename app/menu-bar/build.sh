@@ -25,6 +25,7 @@ arch=$(uname -m)
 xcrun swiftc -parse-as-library -swift-version 5 -O -target "$arch-apple-macos14.0" \
     -module-cache-path "$stage/modules" "$root"/app/menu-bar/*.swift -o "$app/Contents/MacOS/Readback"
 cp "$root/app/menu-bar/Info.plist" "$app/Contents/"
+cp "$root/app/menu-bar/Assets/ReadbackMark.svg" "$root/app/menu-bar/Assets/Readback.icns" "$app/Contents/Resources/"
 for helper in readback_settings project_registry outside_judge; do
     cp "$root/scripts/$helper.py" "$app/Contents/Resources/python/"
 done

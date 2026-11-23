@@ -17,7 +17,9 @@ final class MenuDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         guard let button = item.button else { return }
-        let image = NSImage(systemSymbolName: "book.closed", accessibilityDescription: "Readback")
+        let image = Bundle.main.url(forResource: "ReadbackMark", withExtension: "svg")
+            .flatMap { NSImage(contentsOf: $0) }
+        image?.size = NSSize(width: 18, height: 18)
         image?.isTemplate = true
         button.image = image
         button.toolTip = "Readback"

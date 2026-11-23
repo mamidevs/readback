@@ -1,12 +1,12 @@
-# readback
+<img src="app/menu-bar/Assets/Readback.svg" width="88" height="88" alt="">
 
-A personal harness for working with coding agents: decisions, evidence, handoffs, and a memory of how the work happened.
+# Readback
 
-A finished change tells you what exists now. It does not tell you why you chose it, what you approved, which checks ran, or what the next session must continue. readback gives that process a shared language and a local logbook. You stay the owner; the lead coordinates workers and an independent judge.
+Readback helps you coordinate coding work across Claude Code and OpenAI Codex. Give the lead a task, let workers continue independently, and review what passed on the combined revision. A local logbook keeps the decisions, evidence and next step available to the next session.
 
-Start with one repository. When a project spans an API, backend, and frontend, optional project settings let those repositories use one logbook while every agent keeps working in its own code directory.
+On macOS, the menu bar panel lets you choose a project's judge model and reasoning effort for each host. Open a project session in the panel to see what the agent has recorded.
 
-**Version:** **v0.9.0** adds Amendment 09: when the contract names a check, VERIFIED rests on that check. It also runs the Git guard hook in Codex and adds a worker eval case for a check that tests less than its statement. v0.8.0 added Amendment 08: evidence rules for the judge, the reviewed folder's Git state in the judge prompt, and the Git guard hook for Claude Code. v0.7.0 added shared-project routing, serialized Markdown publication, and document indexing. The core communication rules are **Readback Protocol v0.8**, which includes Amendment 11. No package ships Amendment 11 yet. The [shared-project extension](docs/protocol-0.7-draft.md) documents the shipped behavior and identifies the extended handoff envelope that remains a draft. Existing installations require an explicit update.
+The `main` branch includes the menu bar app and Readback Protocol v0.8 through Amendment 11. The `v0.9.0` tag is an earlier snapshot. Use `main` for the features described below.
 
 ## What it does
 
@@ -29,9 +29,9 @@ readback organizes a personal agent workflow. It does not provide a hosted team 
   <img alt="A task passes between the owner, lead, worker, independent judge, and logbook." src="docs/flow-light.svg">
 </picture>
 
-The lead records approvals when needed, defines the task, and delegates it. The worker returns its readback and evidence. The judge checks the handoff against the contract. The lead accepts work only when the worker reports DONE and every contract statement is VERIFIED. Depending on the judge mode, an outside judge must also return PASS. The lead then records the result and next step.
+The lead gives each worker a bounded contract. A worker records its checks, hands off the result and can continue with the next independent task. The lead reviews exceptions as they arise. Work that depends on an unresolved result waits for it.
 
-The default readback arrives with the handoff. For a risky start, request a confirmed readback before the worker begins. A PASS supports the handoff's claims; an honest PARTIAL handoff can pass without completing the task.
+At the end of a section, the lead brings the work together and tests the requested behavior on the combined revision. In the default review mode, the other provider judges that evidence once for the section. A judge can return PASS on an accurate partial report. Closing the section also requires the checks to cover the requested behavior and pass.
 
 You receive a short brief after work that changed something:
 
@@ -44,6 +44,20 @@ Next:      Review the deployment separately.
 ```
 
 Labels follow your language; quotations and fixed status words retain their meaning. Plain questions can receive a short answer without a brief. [EXAMPLE.md](EXAMPLE.md) shows a complete task; [PROTOCOL.md](PROTOCOL.md) defines the messages and rules.
+
+## macOS menu bar
+
+From a checkout of `main` on macOS 14 or later with the Apple Command Line Tools installed, build and open the panel once:
+
+```sh
+app/menu-bar/build.sh && open app/menu-bar/build/Readback.app
+```
+
+1. Click the return-arrow icon in the menu bar and select a project.
+2. Choose **Bölüm sonunda** for a section-end review or **Her teslimde** to also review individual handoffs. Open **Hakem modelleri**, select the host, set the judge model and effort, then choose **Kaydet**. Each host reads its own route from that project's settings. In **Her teslimde**, step and section-end reviews have separate routes.
+3. Open **Proje oturumları** and select a Claude Code or Codex session. Its detail view refreshes while open and shows recorded operations. For Claude Code Mode, this includes child tool calls and their results when the transcript contains them.
+
+For later launches, open the built `Readback.app`. See the [panel installation guide](INSTALL.md#macos-menu-bar) for rebuilds and session status labels.
 
 ## One repository or one project
 
@@ -121,7 +135,7 @@ cp -R readback/portable/skills/* ~/.agents/skills/
 printf '\nFor every task, and when I ask to continue earlier work, load the skill `readback` and follow it.\n' >> ~/.codex/AGENTS.md
 ```
 
-Run this setup once. The clone uses `main`; check out the `v0.9.0` tag before copying if you need this exact release. To use an existing checkout, copy its `portable/skills/` folders into `~/.agents/skills/`, including the bundled scripts. For a checkout tracking `main`, pull and copy again. For a pinned release, select the newer tag and copy again. Start a fresh session after updating.
+Run this setup once. The clone uses `main`; check out `v0.9.0` before copying only if you need that earlier release. To use an existing checkout, copy its `portable/skills/` folders into `~/.agents/skills/`, including the bundled scripts. For a checkout tracking `main`, pull and copy again. For a pinned release, select the newer tag and copy again. Start a fresh session after updating.
 
 [INSTALL.md](INSTALL.md) covers installation checks, permissions, updates, and removal. Installing instructions does not grant access to your logbook; your CLI may ask for that separately.
 
@@ -178,6 +192,7 @@ This is a personal workflow with cooperating local sessions. It has no multi-use
 |---|---|
 | [PROTOCOL.md](PROTOCOL.md), [EXAMPLE.md](EXAMPLE.md) | Core rules and a worked task |
 | [INSTALL.md](INSTALL.md) | Install, check, update, remove |
+| [app/menu-bar/](app/menu-bar/) | Native macOS panel for project judge settings and session activity |
 | [Shared projects](docs/shared-projects.md), [project identity](docs/project-identity.md) | Optional project memory and its operational contract |
 | [Shared-project extension](docs/protocol-0.7-draft.md), [schemas/](schemas/) | Shipped extension, generic data shapes, and the explicitly draft handoff envelope |
 | [output-styles/](output-styles/), [agents/](agents/), [skills/](skills/) | Claude Code instructions |

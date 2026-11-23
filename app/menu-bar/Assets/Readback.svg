@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="enamel" x2="0.8" y2="1">
+      <stop stop-color="#236366"/>
+      <stop offset=".56" stop-color="#123f46"/>
+      <stop offset="1" stop-color="#082c35"/>
+    </linearGradient>
+    <linearGradient id="rim" x2=".22" y2="1">
+      <stop stop-color="#6a9990"/>
+      <stop offset="1" stop-color="#123840"/>
+    </linearGradient>
+  </defs>
+  <rect x="80" y="88" width="864" height="864" rx="202" fill="#092833" opacity=".16"/>
+  <rect x="80" y="76" width="864" height="864" rx="202" fill="url(#rim)"/>
+  <rect x="86" y="82" width="852" height="852" rx="196" fill="url(#enamel)"/>
+  <g transform="translate(170 134) scale(30)" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3.5 4.5h10a6 6 0 0 1 0 12h-9m4-4-4 4 4 4" stroke="#fff5da"/>
+    <path d="M3.5 9.5h6" stroke="#89dccb"/>
+  </g>
+</svg>
