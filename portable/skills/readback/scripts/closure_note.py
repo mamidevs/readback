@@ -161,9 +161,9 @@ def check_note(text):
     if "ACCEPTED" in values:
         fields = values["ACCEPTED"].split(" | ", 2)
         answer = fields[0].strip()
-        if not (answer.startswith("yes") or answer.startswith("no")):
-            findings.append("ACCEPTED value starts with neither yes nor no: %r" % values["ACCEPTED"])
-        elif answer.startswith("no") and (len(fields) < 3 or not fields[2].strip()):
+        if answer not in ("yes", "no"):
+            findings.append("ACCEPTED first field is neither yes nor no: %r" % answer)
+        elif answer == "no" and (len(fields) < 3 or not fields[2].strip()):
             findings.append("ACCEPTED no has no reason")
         if len(fields) < 2 or not valid_date(fields[1].strip()):
             findings.append("ACCEPTED date is not YYYY-MM-DD: %r" % (fields[1].strip() if len(fields) > 1 else ""))

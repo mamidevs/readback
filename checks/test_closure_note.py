@@ -284,9 +284,16 @@ class DefectTests(Base):
                 self.assert_finding(self.replace_line(self.rev(), "JUDGE", bad), "JUDGE")
 
     def test_accepted_value_starts_with_neither_yes_nor_no(self):
-        for bad in ("maybe | 2026-11-23", "YES | 2026-11-23", "| 2026-11-23"):
+        for bad in ("maybe | 2026-11-23", "YES | 2026-11-23", "| 2026-11-23", "yesterday | 2026-11-23",
+                    "nope | 2026-11-23 | reason", "yes, | 2026-11-23", "nothing | 2026-11-23 | r"):
             with self.subTest(bad):
                 self.assert_finding(self.replace_line(self.acc(), "ACCEPTED", "ACCEPTED " + bad), "ACCEPTED")
+
+    def test_accepted_first_field_is_exactly_yes_or_no_after_trimming(self):
+        for good in ("ACCEPTED yes | 2026-11-23", "ACCEPTED \tyes\t | 2026-11-23", "ACCEPTED no | 2026-11-23 | r"):
+            with self.subTest(good):
+                res, obj = self.check_text(self.replace_line(self.acc(), "ACCEPTED", good))
+                self.assertEqual(res.returncode, 0, obj)
 
     def test_accepted_no_without_reason(self):
         for bad in ("ACCEPTED no | 2026-11-23", "ACCEPTED no | 2026-11-23 | ", "ACCEPTED no"):
