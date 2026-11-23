@@ -4,7 +4,9 @@
 Usage: python3 scripts/handoff_skeleton.py [--text] CONTRACT
 
 It reads one contract through `validate_handoff.parse_contract` and prints one
-JSON object with the keys of PROTOCOL.md 3.3 in their order. With `--text` it
+JSON object with the keys of PROTOCOL.md 3.3 in their order. Directly after `id`
+stand `contract_id`, the id of the contract, and `replaces`, the placeholder
+`<HND id or none>` (the validator's rule V7 checks both). With `--text` it
 prints the same content in the spaced key form. In `checks` stands one string
 `<check text> | exit <n> | <result>` for each distinct Check text, in contract
 order. In `contract` stands every ACC id with the placeholder
@@ -59,6 +61,8 @@ def build(contract):
             ids.append(st["id"])
     return [
         ("id", "HND-<YYYYMMDD>-<NN>"),
+        ("contract_id", contract["id"] or "CON-<YYYYMMDD>-<NN>"),
+        ("replaces", "<HND id or none>"),
         ("from", "<agent role>"),
         ("date", "<YYYY-MM-DD>"),
         ("state", "<DONE, PARTIAL, BLOCKED or UNABLE>"),
@@ -88,7 +92,7 @@ def as_text(pairs):
             lines = ["%s %s" % item for item in value]
         else:
             lines = value if isinstance(value, list) else [value]
-        out.append(key.ljust(10) + lines[0])
+        out.append(key.ljust(max(10, len(key) + 1)) + lines[0])
         out.extend(INDENT + line for line in lines[1:])
     return "\n".join(out) + "\n"
 

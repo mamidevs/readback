@@ -184,8 +184,8 @@ class GrammarTests(unittest.TestCase):
         self.assertEqual(rules(result), [("V2", None, "unresolved")])
 
     def test_version_and_docstring_describe_version_2(self):
-        self.assertEqual(vh.VALIDATOR_VERSION, "2.2.0")
-        self.assertEqual(vh.validate(CONTRACT, handoff())["validator_version"], "2.2.0")
+        self.assertEqual(vh.VALIDATOR_VERSION, "2.3.0")
+        self.assertEqual(vh.validate(CONTRACT, handoff())["validator_version"], "2.3.0")
         doc = " ".join(vh.__doc__.split())
         # the five section starts, in the words of D1
         self.assertIn("`Limits`, `Definitions`, `Evidence requirements`, `Coverage list` or `Command lines`", doc)
@@ -270,7 +270,7 @@ class GrammarTests(unittest.TestCase):
                          ("CON-20261117-01", "t", "o", {"note": "a\nb"}, []))
         self.assertEqual([(s["id"], s["statement"], s["check"]) for s in parsed["statements"]],
                          [("ACC-1", "s", "sh a.sh"), ("ACC-2", "s2", "sh b.sh")])
-        self.assertEqual(vh.validate(text, handoff()), {"valid": True, "findings": [], "validator_version": "2.2.0"})
+        self.assertEqual(vh.validate(text, handoff()), {"valid": True, "findings": [], "validator_version": "2.3.0"})
         spaced = vh.parse_contract(json.dumps({"id": "CON-20261117-01", "Out of scope": "o2"}))
         self.assertEqual((spaced["out_of_scope"], spaced["extra"]), ("o2", {}))
         notlist = vh.parse_contract(json.dumps({"id": "CON-20261117-01", "acc": "text", "statements": 5}))
@@ -582,11 +582,11 @@ class EvidenceTests(unittest.TestCase):
     def test_a_result_that_names_a_tool_call_is_complete_evidence(self):
         contract = "CON-20261117-01  T\nACC-1  s   Check: printf tool\n"
         result = vh.validate(contract, handoff(contract="ACC-1 VERIFIED", checks=("printf tool | exit 0 | tool call",)))
-        self.assertEqual(result, {"valid": True, "findings": [], "validator_version": "2.2.0"})
+        self.assertEqual(result, {"valid": True, "findings": [], "validator_version": "2.3.0"})
         contract = "CON-20261117-01  T\nACC-1  s   Check: Grep tool, x\n"
         for line in ("Grep tool, x | no exit code (tool call) | tool call", "Grep tool, x | no exit code (tool call) | one"):
             result = vh.validate(contract, handoff(contract="ACC-1 VERIFIED", checks=(line,)))
-            self.assertEqual(result, {"valid": True, "findings": [], "validator_version": "2.2.0"}, line)
+            self.assertEqual(result, {"valid": True, "findings": [], "validator_version": "2.3.0"}, line)
 
     def test_v4_messages(self):
         # a FAILED status with a cut marker: unresolved, and the status word is shown
@@ -874,7 +874,7 @@ REAL_CONTRACTS = ("CON-20261118-01", "CON-20261118-08", "CON-20261118-11")
 
 
 def ok_result(valid=True, findings=()):
-    return {"valid": valid, "findings": list(findings), "validator_version": "2.2.0"}
+    return {"valid": valid, "findings": list(findings), "validator_version": "2.3.0"}
 
 
 class SectionTests(unittest.TestCase):
