@@ -115,6 +115,23 @@ class DispatchTests(unittest.TestCase):
     def test_inline_delivers_all_ids(self):
         self.assert_silent(event("CON-20261119-08 CON-20261119-09\nACC-1 The hook shall deny it"))
 
+    def test_marker_boundary_is_not_a_statement(self):
+        for line in ("ACC-1suffix two words", "ACC-1a The hook shall deny", "ACC-1-2 The hook shall deny",
+                     "ACC-1_x The hook shall deny", "ACC- The hook shall deny", "ACC-x The hook shall deny",
+                     "acc-1 The hook shall deny", "Acc-1 The hook shall deny", "xACC-1 The hook shall deny"):
+            with self.subTest(line=line):
+                self.assert_denied(event("CON-20261119-08\n" + line), ["CON-20261119-08"])
+
+    def test_colon_marker_is_a_statement(self):
+        self.assert_silent(event("CON-20261119-08\nACC-1: The hook shall deny"))
+        self.assert_silent(event("CON-20261119-08\nACC-12 The hook shall deny"))
+
+    def test_letter_after_id_is_not_an_id(self):
+        self.assert_silent(event("Package CON-20261119-08x and CON-20261119-08_y"))
+        self.assert_denied(event("CON-20261119-08x CON-20261119-09"), ["CON-20261119-09"])
+        reason = self.assert_denied(event("CON-20261119-08x CON-20261119-09"), [])
+        self.assertNotIn("CON-20261119-08", reason)
+
     def test_no_id(self):
         self.assert_silent(event("Fix the typo in README.md"))
         self.assert_silent(event("Mention CON-2026-1 and CON-20261119-1234567"))

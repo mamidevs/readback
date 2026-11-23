@@ -22,8 +22,8 @@ import os
 import re
 import sys
 
-ID = re.compile(r"(?<![A-Za-z0-9])CON-\d{8}-\d{2,6}(?!\d)")
-STATEMENT = re.compile(r"^[ \t>|*+\-•]*(?:\d+[.)][ \t]+)?ACC-\d+(?!\d)(.*)$")
+ID = re.compile(r"(?<![A-Za-z0-9_])CON-\d{8}-\d{2,6}(?![A-Za-z0-9_])")
+STATEMENT = re.compile(r"^[ \t>|*+\-•]*(?:\d+[.)][ \t]+)?ACC-\d+(?![A-Za-z0-9_-])(.*)$")
 EDGE = "`'\"()[]{}<>"
 TRAILING = ".,;:!?"
 
