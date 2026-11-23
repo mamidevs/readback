@@ -18,7 +18,7 @@ The ids of a conflict: `decision` and `invalid-note` and `unreadable` the one re
 record that holds the value, then the value; `contract-mismatch` the note, then the handoff;
 `withdrawn-and-closed` the withdrawal note, then the contract.
 
-A record is a file `<id>.md` directly in the folder, with the kind CON, HND or NOTE. The script
+A record is a file `<id>.md` directly in the folder, with the kind CON, HND or NOTE. Each CRLF in a record is read as LF; a lone CR stays. The script
 reads no other file, changes no record and writes no file. Every list is sorted by id (string
 order); two runs on the same folder print the same bytes. It reads form and links; it does not
 show that a verdict is right.
@@ -82,7 +82,7 @@ def read_folder(folder):
             continue
         try:
             with open(path, "rb") as handle:
-                records[name[:-3]] = handle.read().decode("utf-8")
+                records[name[:-3]] = handle.read().decode("utf-8").replace("\r\n", "\n")
         except (OSError, UnicodeDecodeError):
             records[name[:-3]] = None
     return records
