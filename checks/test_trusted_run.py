@@ -72,6 +72,11 @@ class RunTests(Base):
         self.assertNotEqual(text[1], str(self.repo))
         self.assertTrue(text[2].startswith(str(self.out)) and text[3].startswith(str(self.out)), text)
 
+    def test_the_script_file_runs_as_a_command_without_an_interpreter(self):
+        done = subprocess.run([str(SCRIPT), "--repo", str(self.repo), "--commit", "HEAD", "--out", str(self.out), "--", "true"],
+                              capture_output=True, text=True, timeout=60)
+        self.assertEqual(done.returncode, 0, done.stderr)
+
     def test_exit_is_1_when_a_command_fails_and_the_chain_uses_sh_ec(self):
         done = self.run_commands("true", "false; true")
         self.assertEqual(done.returncode, 1)
