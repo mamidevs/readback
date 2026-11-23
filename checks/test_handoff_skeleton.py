@@ -20,7 +20,10 @@ import validate_handoff  # noqa: E402
 
 KEYS = ["id", "from", "date", "state", "readback", "summary", "changes",
         "commit", "checks", "contract", "open", "issues", "next"]
+# the skeleton holds the two link keys of CON-20261123-07 directly after `id`
+SKELETON_KEYS = KEYS[:1] + ["contract_id", "replaces"] + KEYS[1:]
 STATUS_PLACEHOLDER = "<VERIFIED, FAILED or UNVERIFIED>"
+REPLACES_PLACEHOLDER = "<HND id or none>"
 
 CHECK_TEXTS = {
     "double quotes": 'echo "a" "b"',
@@ -63,6 +66,7 @@ class Base(unittest.TestCase):
     def fill_json(self, out, results=None):
         obj = json.loads(out)
         obj["id"] = "HND-20261123-01"
+        obj["replaces"] = "none"
         obj["from"] = "worker"
         obj["date"] = "2026-11-23"
         obj["state"] = "DONE"
@@ -84,7 +88,7 @@ class Base(unittest.TestCase):
                          ("<agent role>", "worker"), ("<DONE, PARTIAL, BLOCKED or UNABLE>", "DONE"),
                          ("<what I will do>", "x"), ("<what I must not change>", "y"),
                          ("<1 to 3 sentences>", summary), ("<file: what changed>", "none"),
-                         ("<repo@sha or none>", "none"), ("<n>", "0"), ("<result>", "ok"),
+                         ("<repo@sha or none>", "none"), (REPLACES_PLACEHOLDER, "none"), ("<n>", "0"), ("<result>", "ok"),
                          (STATUS_PLACEHOLDER, "VERIFIED"),
                          ("<the work that remains and why, or —>", "-"),
                          ("<severity: description, or —>", "-"),
@@ -97,7 +101,7 @@ class KeyOrderTests(Base):
     def test_keys_in_protocol_order(self):
         out = self.skeleton(contract_text(["sh a.sh"]))
         obj = json.loads(out, object_pairs_hook=lambda p: p)
-        self.assertEqual([k for k, _ in obj], KEYS)
+        self.assertEqual([k for k, _ in obj], SKELETON_KEYS)
         self.assertEqual(list(validate_handoff.REQUIRED_KEYS), KEYS)
 
     def test_prints_one_json_object(self):
@@ -110,7 +114,7 @@ class KeyOrderTests(Base):
         out = self.skeleton(contract_text(["sh a.sh"]), "--text")
         parsed = validate_handoff.parse_handoff(out)
         self.assertEqual(parsed["form"], "text")
-        self.assertEqual([k for k, _ in parsed["pairs"]], KEYS)
+        self.assertEqual([k for k, _ in parsed["pairs"]], SKELETON_KEYS)
         self.assertEqual(parsed["problems"], [])
         self.assertFalse(out.lstrip().startswith("{"))
 
@@ -118,7 +122,7 @@ class KeyOrderTests(Base):
         text = contract_text(["sh a.sh", 'sh -c "a && b"', "sh a.sh"])
         obj = json.loads(self.skeleton(text))
         parsed = validate_handoff.parse_handoff(self.skeleton(text, "--text"))
-        for key in KEYS:
+        for key in SKELETON_KEYS:
             value = obj[key]
             if isinstance(value, dict):
                 value = "\n".join("%s %s" % item for item in value.items())
@@ -229,7 +233,7 @@ class RoundTripTests(Base):
         self.assertIs(result["valid"], True, result["findings"])
         parsed = validate_handoff.parse_handoff(filled)
         self.assertEqual(parsed["values"]["summary"], "Done.\nSecond line.")
-        self.assertEqual([k for k, _ in parsed["pairs"]], KEYS)
+        self.assertEqual([k for k, _ in parsed["pairs"]], SKELETON_KEYS)
 
 
 class KnownLimitTests(Base):

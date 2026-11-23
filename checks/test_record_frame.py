@@ -198,7 +198,7 @@ class FrameTests(unittest.TestCase):
     def test_a05_a_text_without_frame_gives_the_same_result_as_before(self):
         self.assertEqual(vh.validate(CONTRACT, SPACED),
                          {"valid": True, "findings": [], "validator_version": vh.VALIDATOR_VERSION})
-        self.assertEqual(vh.VALIDATOR_VERSION, "2.2.0")
+        self.assertEqual(vh.VALIDATOR_VERSION, "2.3.0")
 
 
 class LineageTests(unittest.TestCase):

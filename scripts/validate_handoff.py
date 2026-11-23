@@ -100,11 +100,27 @@ JSON form
   `statement` and `check`.
 
 Extra keys are kept in the `extra` field of the parsed result and are never a
-defect, in both forms; a handoff that holds a colon key has no extra key (see
+defect, in both forms (the two link keys are checked by V7); a handoff that holds a colon key has no extra key (see
 the colon keys above).
 
-Rules V1 to V6 are in the functions `check_contract`, `check_handoff` and
-`check_evidence`. A finding has `rule`, `acc`, `level` and `message`. Level
+Links of a handoff (version 2.3)
+  A handoff may hold the keys `contract_id` and `replaces`; the skeleton prints
+  them directly after `id`. They are not in the key list of 3.3, so V2 does not
+  ask for them and does not check their order. Both are keys in the colon key
+  form (`replaces: none`) and, in a handoff without a colon key, in the spaced
+  key form and the JSON form; in a handoff that holds a colon key a spaced
+  `replaces  none` line is a key too. Rule V7 reads the first value of each key
+  with ASCII spaces, tabs and line breaks removed at both ends. A CON id is
+  `CON-<8 digits>-<2 to 6 digits>` and an HND id is `HND-<8 digits>-<2 to 6
+  digits>`, with the ASCII digits 0 to 9. V7 reports a defect when a key stands
+  more than once; when `contract_id` is no CON id, or is one that differs from
+  the id of the contract (compared when the contract is readable and has an id);
+  when `replaces` is neither `none` nor an HND id (the placeholder `<HND id or
+  none>` is such a value and is named); and when `replaces` equals the own `id`
+  of the handoff. A handoff without either key gets no V7 finding.
+
+Rules V1 to V7 are in the functions `check_contract`, `check_handoff`,
+`check_links` and `check_evidence`. A finding has `rule`, `acc`, `level` and `message`. Level
 `defect` means a certain break. Level `unresolved` means the validator cannot
 tell. `valid` is false for any defect, else "unparsed" for any unresolved
 finding, else true. V6 compares text only and is never a defect.
@@ -114,17 +130,18 @@ import json
 import re
 import sys
 
-VALIDATOR_VERSION = "2.2.0"
+VALIDATOR_VERSION = "2.3.0"
 
 REQUIRED_KEYS = (
     "id", "from", "date", "state", "readback", "summary", "changes",
     "commit", "checks", "contract", "open", "issues", "next",
 )
+LINK_KEYS = ("contract_id", "replaces")
 STATES = ("DONE", "PARTIAL", "BLOCKED", "UNABLE")
 STATUSES = ("VERIFIED", "FAILED", "UNVERIFIED")
 
 _KEY_RE = re.compile(r"^(Out of scope:|[A-Za-z][A-Za-z0-9_-]*)(?=[ \t\r]|$)")
-_KEY3 = "(" + "|".join(REQUIRED_KEYS) + ")"
+_KEY3 = "(" + "|".join(REQUIRED_KEYS + LINK_KEYS) + ")"
 _COLON_KEY_RE = re.compile("^" + _KEY3 + ":")
 _PLAIN_KEY3_RE = re.compile("^" + _KEY3 + r"(?=[ \t\r]|$)")
 _SECTION_RE = re.compile(
@@ -133,6 +150,9 @@ _SECTION_DEFECT_RE = re.compile(r"^(?:ACC|CON)-[0-9]")
 _SECTION_LINE_RE = re.compile(r"^[ \t]*(?:ACC|CON)-")
 _CON_ID_RE = re.compile(r"^CON-\d{8}-\d{2}$")
 _ACC_ID_RE = re.compile(r"^ACC-\d+$")
+_LINK_CON_RE = re.compile(r"CON-[0-9]{8}-[0-9]{2,6}")
+_LINK_HND_RE = re.compile(r"HND-[0-9]{8}-[0-9]{2,6}")
+_REPLACES_PLACEHOLDER = "<HND id or none>"
 _CHECK_RE = re.compile(r"(?:^|\s)Check:[ \t]*(.*)\Z", re.S)
 _STATUS_PART_RE = re.compile(r"^(ACC-\d+)\s+([A-Za-z]+)(?:\s*\((.*)\))?$", re.S)
 _EXIT_RE = re.compile(r"^exit(?:[ \t]+code)?[ \t]*[= ]?[ \t]*-?\d+$", re.I)
@@ -440,6 +460,33 @@ def check_contract(contract):
     return out
 
 
+def check_links(contract, handoff):
+    """V7: the keys `contract_id` and `replaces`, each optional, each at most once."""
+    out = []
+    for key in LINK_KEYS:
+        n = sum(1 for k, _ in handoff["pairs"] if k == key)
+        if n > 1:
+            out.append(_finding("V7", None, "defect", "the key `%s` appears %d times" % (key, n)))
+    if "contract_id" in handoff["values"]:
+        value = handoff["values"]["contract_id"].strip(" \t\r\n")
+        if not _LINK_CON_RE.fullmatch(value):
+            out.append(_finding("V7", None, "defect",
+                                "contract_id %r is not a CON id (CON-<8 digits>-<2 to 6 digits>)" % value[:60]))
+        elif contract["ok"] and contract["id"] is not None and value != contract["id"]:
+            out.append(_finding("V7", None, "defect",
+                                "contract_id %r differs from the contract id %r" % (value, contract["id"][:60])))
+    if "replaces" in handoff["values"]:
+        value = handoff["values"]["replaces"].strip(" \t\r\n")
+        if value == _REPLACES_PLACEHOLDER:
+            out.append(_finding("V7", None, "defect", "replaces still holds the placeholder %s" % value))
+        elif value != "none" and not _LINK_HND_RE.fullmatch(value):
+            out.append(_finding("V7", None, "defect",
+                                "replaces %r is neither `none` nor an HND id (HND-<8 digits>-<2 to 6 digits>)" % value[:60]))
+        elif value == handoff["values"].get("id", "").strip(" \t\r\n"):
+            out.append(_finding("V7", None, "defect", "replaces %r equals the own id of the handoff" % value))
+    return out
+
+
 def check_handoff(handoff):
     """V2: every key of PROTOCOL.md 3.3, in order, once each, and a valid state."""
     out = []
@@ -680,6 +727,7 @@ def validate(contract_text, handoff_text):
         findings.extend(check_contract(contract))
     if handoff["ok"]:
         findings.extend(check_handoff(handoff))
+        findings.extend(check_links(contract, handoff))
     if contract["ok"] and handoff["ok"]:
         status_findings, entries = check_statuses(contract, handoff)
         findings.extend(status_findings)
