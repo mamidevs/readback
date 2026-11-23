@@ -20,16 +20,29 @@ ENVELOPE = "<!-- readback record=NOTE-20261123-41 sha=0f0f -->"
 GOOD = ["kind withdrawal", "contract " + CON, "replaced-by " + OTHER, "date 2026-11-23", "reason the scope moved"]
 
 # One list of calls feeds the printing tests and the test that checks every printed note.
+def argv(contract, replaced_by, date, reason):
+    return ["withdrawal", "--contract", contract, "--replaced-by", replaced_by, "--date", date, "--reason", reason]
+
+
+# Each entry is the full argument list of one call that exits 0. Every test that prints a withdrawal
+# note with exit 0 takes its call from here by label, so the check of every printed note covers all.
 CALLS = [
-    ("with a CON id", [CON, OTHER, "2026-11-23", "the scope moved"]),
-    ("with none", [CON, "none", "2026-11-23", "dropped by the owner"]),
-    ("reason with a bar", [CON, "none", "2026-11-24", "a | b | c"]),
-    ("reason with inner spaces and a tab", [CON, "none", "2026-02-28", "two  words\tand a tab"]),
-    ("leap day", [CON, "none", "2028-02-29", "leap"]),
-    ("short and long ids", ["CON-20261123-12", "CON-20261123-123456", "2026-11-23", "r"]),
-    ("reason with padding", [CON, "none", "2026-11-23", "   padded   "]),
-    ("reason that starts with a key word", [CON, "none", "2026-11-23", "kind review"]),
+    ("with a CON id", argv(CON, OTHER, "2026-11-23", "the scope moved")),
+    ("with none", argv(CON, "none", "2026-11-23", "dropped by the owner")),
+    ("reason with a bar", argv(CON, "none", "2026-11-24", "a | b | c")),
+    ("reason with inner spaces and a tab", argv(CON, "none", "2026-02-28", "two  words\tand a tab")),
+    ("leap day", argv(CON, "none", "2028-02-29", "leap")),
+    ("short and long ids", argv("CON-20261123-12", "CON-20261123-123456", "2026-11-23", "r")),
+    ("reason with padding", argv(CON, "none", "2026-11-23", "   padded   ")),
+    ("reason that starts with a key word", argv(CON, "none", "2026-11-23", "kind review")),
+    ("one letter reason", argv(CON, "none", "2026-11-23", "x")),
+    ("reason padded inside", argv(CON, "none", "2026-11-23", "   padded   inside  ")),
+    ("options in another order", ["withdrawal", "--reason", "r", "--date", "2026-11-23", "--replaced-by", "none", "--contract", CON]),
 ]
+
+
+def call(label):
+    return run(*dict(CALLS)[label])
 
 
 def run(*args):
@@ -38,7 +51,7 @@ def run(*args):
 
 
 def withdraw(contract, replaced_by, date, reason):
-    return run("withdrawal", "--contract", contract, "--replaced-by", replaced_by, "--date", date, "--reason", reason)
+    return run(*argv(contract, replaced_by, date, reason))
 
 
 class Base(unittest.TestCase):
@@ -70,27 +83,27 @@ class Base(unittest.TestCase):
 
 class PrintTests(Base):
     def test_exact_lines_with_a_con_id_in_replaced_by(self):
-        res = withdraw(CON, OTHER, "2026-11-23", "the scope moved")
+        res = call("with a CON id")
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual(res.stderr, "")
         self.assertEqual(res.stdout, "kind withdrawal\ncontract %s\nreplaced-by %s\ndate 2026-11-23\nreason the scope moved\n" % (CON, OTHER))
 
     def test_exact_lines_with_none_in_replaced_by(self):
-        res = withdraw(CON, "none", "2026-11-23", "dropped by the owner")
+        res = call("with none")
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual(res.stdout, "kind withdrawal\ncontract %s\nreplaced-by none\ndate 2026-11-23\nreason dropped by the owner\n" % CON)
 
     def test_exactly_five_lines_in_the_order_of_the_contract(self):
-        res = withdraw(CON, "none", "2026-11-23", "x")
+        res = call("one letter reason")
         self.assertEqual([l.split(" ")[0] for l in res.stdout.split("\n")[:-1]],
                          ["kind", "contract", "replaced-by", "date", "reason"])
 
     def test_reason_is_trimmed_and_keeps_inner_text(self):
-        res = withdraw(CON, "none", "2026-11-23", "   padded   inside  ")
+        res = call("reason padded inside")
         self.assertEqual(res.stdout.split("\n")[4], "reason padded   inside")
 
     def test_options_in_another_order(self):
-        res = run("withdrawal", "--reason", "r", "--date", "2026-11-23", "--replaced-by", "none", "--contract", CON)
+        res = call("options in another order")
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual(res.stdout.split("\n")[1], "contract " + CON)
 
@@ -111,9 +124,9 @@ class CheckAcceptsTests(Base):
         self.assertEqual(res.returncode, 0, res.stdout)
 
     def test_check_on_every_printed_note_plain_and_with_an_envelope(self):
-        for label, call in CALLS:
+        for label, args in CALLS:
             with self.subTest(label):
-                res = withdraw(*call)
+                res = run(*args)
                 self.assertEqual(res.returncode, 0, res.stderr)
                 for text in (res.stdout, ENVELOPE + "\n" + res.stdout):
                     checked, obj = self.check_text(text)
@@ -271,7 +284,7 @@ class ExitTwoTests(Base):
 
     def test_the_script_writes_no_file(self):
         before = sorted(p.name for p in (ROOT / "scripts").iterdir())
-        withdraw(CON, "none", "2026-11-23", "r")
+        call("with none")
         self.base(**{"--date": "bad"})
         self.assertEqual(sorted(p.name for p in (ROOT / "scripts").iterdir()), before)
 
@@ -280,9 +293,9 @@ class SelfCheckTests(Base):
     """The script prints no note that its own check rejects (a rule of the Definitions)."""
 
     def test_check_accepts_every_note_that_exits_zero(self):
-        for label, call in CALLS:
+        for label, args in CALLS:
             with self.subTest(label):
-                res = withdraw(*call)
+                res = run(*args)
                 self.assertEqual(res.returncode, 0, res.stderr)
                 checked, obj = self.check_text(res.stdout)
                 self.assertEqual(checked.returncode, 0, res.stdout)
@@ -290,9 +303,9 @@ class SelfCheckTests(Base):
     def test_every_call_that_exits_two_prints_nothing(self):
         bad = [(CON, CON, "2026-11-23", "r"), ("HND-20261123-1", "none", "2026-11-23", "r"),
                (CON, "none", "2026-13-40", "r"), (CON, "none", "2026-11-23", " "), (CON, "x", "2026-11-23", "r")]
-        for call in bad:
-            with self.subTest(call):
-                res = withdraw(*call)
+        for args in bad:
+            with self.subTest(args):
+                res = withdraw(*args)
                 self.assertEqual((res.returncode, res.stdout), (2, ""))
 
     def test_the_self_check_runs_the_rules_of_check(self):
