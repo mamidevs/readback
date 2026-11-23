@@ -61,9 +61,16 @@ def seconds_of(text):
 
 
 def lineage_of(text):
-    """The id at the start of the first line that is not blank, else None."""
+    """The id at the start of the first line that is not blank, else None. When that line is
+    the publisher's envelope (`<!-- readback ` ... `-->`), the next line that is not blank."""
+    envelope_open = True
     for line in text.splitlines():
         if line.strip():
+            if (envelope_open and line.startswith("<!-- readback ")
+                    and line.rstrip(" \t\r").endswith("-->")
+                    and line.rstrip(" \t") != "<!-- readback lead -->"):
+                envelope_open = False
+                continue
             words = line.split()
             return words[0] if LINEAGE.fullmatch(words[0]) else None
     return None

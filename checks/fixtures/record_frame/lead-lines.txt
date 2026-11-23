@@ -1,0 +1,7 @@
+
+<!-- readback lead -->
+JUDGE      PASS | judge-a | branch-x@abc1234 | see the complete answer below
+execution  provider | model | high | cli | none
+receipt    00000000 | ends-equal | validation true | file-a
+ACCEPTED  yes | 2026-11-17
+Free note from the lead.
