@@ -349,6 +349,7 @@ END-READBACK-TASK
 
 - At the start of work, read the publisher snapshot for the task. Keep its generation and block digest with your working copy.
 - After each BRIEF, publish OPEN and NEXT for the same repository, task and worktree using that snapshot. Keep GOAL and IN FORCE shared.
+- Take the open contracts and handoffs from `scripts/open_work.py`. Name its conflicts and its unlinked count with them.
 - If a task update conflicts, reread that task and reconcile its open work before publishing. Resolve duplicate LOG or record IDs separately.
 - Preserve earlier unscoped OPEN and NEXT entries until a lead explicitly reconciles them. Keep unresolved blocks when a branch or worktree disappears.
 - CURRENT.md is a summary. If it disagrees with a record, the record wins.

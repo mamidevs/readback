@@ -6,13 +6,17 @@ Usage:
   closure_note.py acceptance --handoff <HND id> --contract <CON id>
       --review <NOTE id or none> --accepted <yes or no> --date <YYYY-MM-DD>
       [--reason <text>] [--rests-on <text>]...
+  closure_note.py withdrawal --contract <CON id> --replaced-by <CON id or none>
+      --date <YYYY-MM-DD> --reason <text>
   closure_note.py check <file>
 
 A review note holds one judge call: the lines `kind review`, `handoff`,
 `contract`, then the first three lines of the helper output unchanged (JUDGE,
 execution, receipt). An acceptance note holds `kind acceptance`, `handoff`,
 `contract`, `review`, `ACCEPTED <yes or no> | <date>` with ` | <reason>` when a
-reason is given, and one `rests-on` line for each `--rests-on`.
+reason is given, and one `rests-on` line for each `--rests-on`. A withdrawal
+note holds the lines `kind withdrawal`, `contract`, `replaced-by` (a CON id or
+`none`), `date` and `reason`.
 
 `check` reads the form of one note and prints one JSON object with `valid`,
 `kind` and `findings`. It leaves out the publisher's envelope line when that is
@@ -21,8 +25,8 @@ the judge said PASS, or that the acceptance is justified.
 
 Exit status: 0 for a printed note, or a valid note. 1 for a note with a defect.
 2 for a missing or malformed argument, `--accepted no` without a reason, a
-file that cannot be read, or a note that `check` would reject (review and
-acceptance run the rules of `check` before they print); standard output stays empty and standard error holds
+file that cannot be read, or a note that `check` would reject (review,
+acceptance and withdrawal run the rules of `check` before they print); standard output stays empty and standard error holds
 one line with the reason. The script writes no file.
 """
 
@@ -39,6 +43,10 @@ KEYS = {"review": ["kind", "handoff", "contract", "JUDGE", "execution", "receipt
         "acceptance": ["kind", "handoff", "contract", "review", "ACCEPTED"]}
 JUDGE_WORDS = ("PASS", "FAIL", "none", "off", "skipped")
 HELPER_KEYS = ("JUDGE", "execution", "receipt")
+# the withdrawal note: ids and dates are ASCII (the digits 0 to 9), as in a stored record
+KEYS["withdrawal"] = ["kind", "contract", "replaced-by", "date", "reason"]
+CON_ASCII_RE = re.compile(r"\ACON-[0-9]{8}-[0-9]{2,6}\Z")
+DATE_ASCII_RE = re.compile(r"\A[0-9]{4}-[0-9]{2}-[0-9]{2}\Z")
 
 
 class Refuse(Exception):
@@ -73,6 +81,33 @@ def no_break(value, option):
     if re.search(r"[\r\n]", value):
         raise Refuse("%s holds a line break" % option)
     return value
+
+
+def ascii_date(text):
+    if not DATE_ASCII_RE.match(text):
+        return False
+    try:
+        datetime.date.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
+
+
+def make_withdrawal(args):
+    contract = args.contract
+    if not CON_ASCII_RE.match(contract):
+        raise Refuse("--contract is not a CON id: %r" % contract)
+    replaced = args.replaced_by
+    if replaced != "none" and not CON_ASCII_RE.match(replaced):
+        raise Refuse("--replaced-by is neither none nor a CON id: %r" % replaced)
+    if replaced == contract:
+        raise Refuse("--replaced-by equals --contract")
+    if not ascii_date(args.date):
+        raise Refuse("--date is not a date in the form YYYY-MM-DD: %r" % args.date)
+    reason = no_break(args.reason, "--reason").strip()
+    if not reason:
+        raise Refuse("--reason is empty")
+    return ["kind withdrawal", "contract " + contract, "replaced-by " + replaced, "date " + args.date, "reason " + reason]
 
 
 def make_review(args):
@@ -127,6 +162,22 @@ def parse_note(text):
     return pairs
 
 
+def withdrawal_findings(values):
+    """The defects that only a withdrawal note can have."""
+    findings = []
+    replaced = values.get("replaced-by")
+    if replaced is not None:
+        if replaced != "none" and not CON_ASCII_RE.match(replaced):
+            findings.append("replaced-by value is neither none nor a CON id: %r" % replaced)
+        elif replaced == values.get("contract") and replaced != "none":
+            findings.append("replaced-by equals contract")
+    if "date" in values and not ascii_date(values["date"]):
+        findings.append("date is not YYYY-MM-DD: %r" % values["date"])
+    if "reason" in values and not values["reason"]:
+        findings.append("reason is empty")
+    return findings
+
+
 def check_note(text):
     findings = []
     values = {}
@@ -142,14 +193,15 @@ def check_note(text):
     if kind is None:
         findings.append("missing key kind")
     elif kind not in KEYS:
-        findings.append("kind is neither review nor acceptance: %r" % kind)
+        findings.append("kind is none of review, acceptance and withdrawal: %r" % kind)
     else:
         for key in KEYS[kind]:
             if key not in values:
                 findings.append("missing key %s" % key)
     if "handoff" in values and not ID_RE["HND"].match(values["handoff"]):
         findings.append("handoff value is no HND id: %r" % values["handoff"])
-    if "contract" in values and not ID_RE["CON"].match(values["contract"]):
+    con_re = CON_ASCII_RE if kind == "withdrawal" else ID_RE["CON"]
+    if "contract" in values and not con_re.match(values["contract"]):
         findings.append("contract value is no CON id: %r" % values["contract"])
     if "review" in values and values["review"] != "none" and not ID_RE["NOTE"].match(values["review"]):
         findings.append("review value is neither none nor a NOTE id: %r" % values["review"])
@@ -159,6 +211,8 @@ def check_note(text):
             findings.append("JUDGE first field is none of PASS, FAIL, none, off, skipped: %r" % fields[0])
         if len(fields) < 4:
             findings.append("JUDGE has %d fields; it needs four separated by ' | '" % len(fields))
+    if kind == "withdrawal":
+        findings.extend(withdrawal_findings(values))
     if "ACCEPTED" in values:
         fields = values["ACCEPTED"].split(" | ", 2)
         answer = fields[0].strip()
@@ -187,6 +241,9 @@ def build_parser():
         acceptance.add_argument(option, required=True)
     acceptance.add_argument("--reason")
     acceptance.add_argument("--rests-on", action="append", default=[])
+    withdrawal = sub.add_parser("withdrawal", allow_abbrev=False, add_help=False)
+    for option in ("--contract", "--replaced-by", "--date", "--reason"):
+        withdrawal.add_argument(option, required=True)
     check = sub.add_parser("check", allow_abbrev=False, add_help=False)
     check.add_argument("file")
     return parser
@@ -208,12 +265,14 @@ def main(argv):
             out = self_check(make_review(args))
         elif args.command == "acceptance":
             out = self_check(make_acceptance(args))
+        elif args.command == "withdrawal":
+            out = self_check(make_withdrawal(args))
         elif args.command == "check":
             result = check_note(read_text(args.file, "the note"))
             sys.stdout.write(json.dumps(result) + "\n")
             return 0 if result["valid"] else 1
         else:
-            raise Refuse("the first argument is review, acceptance or check")
+            raise Refuse("the first argument is review, acceptance, withdrawal or check")
     except Refuse as err:
         sys.stderr.write(" ".join(str(err).split()) + "\n")
         return 2
