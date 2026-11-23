@@ -75,6 +75,11 @@ The last two commands use your provider accounts and consume model calls.
 The plugin ships the hook `hooks/judge_line.py` for the events `UserPromptSubmit`, `SessionStart` and `SessionEnd`. The plugin's `hooks/hooks.json` names it for each event. You add nothing.
 The hook reads the judge line that the owner writes as the first line of a prompt. [AMENDMENT-11.md](AMENDMENT-11.md) holds the forms.
 
+### Dispatch guard
+
+The plugin ships the hook `hooks/guard_dispatch.py` for PreToolUse with the matcher `Agent|Task`. It denies a `readback:worker` dispatch whose prompt names a CON id and delivers no statement of it. [AMENDMENT-12.md](AMENDMENT-12.md) holds the rules.
+The hook runs in Claude Code only. A Codex lead has the two text rules only: the CONTRACT rule of the output style and section 3.2 of PROTOCOL.md.
+
 ## Try it without an install
 
 ```

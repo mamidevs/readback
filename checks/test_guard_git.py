@@ -199,7 +199,7 @@ class GuardGitTests(unittest.TestCase):
     def test_plugin_config_runs_the_hook_before_bash(self):
         config = json.loads(CONFIG.read_text(encoding="utf-8"))
         entries = config["hooks"]["PreToolUse"]
-        self.assertEqual([entry["matcher"] for entry in entries], ["Bash"])
+        self.assertEqual([entry["matcher"] for entry in entries], ["Bash", "Agent|Task"])
         command = entries[0]["hooks"][0]["command"]
         self.assertIn("${CLAUDE_PLUGIN_ROOT}/hooks/guard_git.py", command)
 

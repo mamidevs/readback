@@ -743,7 +743,8 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(config["hooks"][name], [{"hooks": [{"type": "command", "command": CLAUDE_JUDGE, "timeout": 10}]}])
         old = json.loads(at_base("hooks/hooks.json"))["hooks"]["PreToolUse"]
         old[0]["hooks"][0]["command"] += " claude"
-        self.assertEqual(config["hooks"]["PreToolUse"], old)
+        self.assertEqual(config["hooks"]["PreToolUse"][:len(old)], old)
+        self.assertEqual([e["matcher"] for e in config["hooks"]["PreToolUse"][len(old):]], ["Agent|Task"])
         self.assertEqual(config["hooks"]["PreToolUse"][0]["hooks"][0]["command"], CLAUDE_GUARD)
 
     def test_the_codex_file(self):
