@@ -158,6 +158,7 @@ The other provider reads the contract, handoff and repository files.
 Fable has Read, Grep and Glob tools only. It cannot rerun shell checks.
 Do not replace an unavailable outside judge with a sub-agent of this host.
 A call that fails gives no verdict. Write `JUDGE none` and do not accept the work.
+When the host refuses the judge call before the helper starts, write `JUDGE none | <provider:model> | <repo@sha or none> | no verdict: host refusal: <the host's reason>`. Do not send the content another way. Ask the owner for a DECISION.
 A FAIL never sends the handoff to another judge.
 PASS is about the handoff. It does not say that the task is complete.
 Accept only a DONE handoff whose contract statements are all VERIFIED.

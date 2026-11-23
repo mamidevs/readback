@@ -380,6 +380,7 @@ A teammate can run at another provider than the lead. Sections 2 to 6 stay the s
 - A change of provider does not change the contract, the checks, the approvals or the permissions.
 - A teammate gets only the context that its contract needs.
 - A call that fails gives no verdict. Write `JUDGE none`. The lead does not accept the work.
+- When the host refuses the judge call before the helper starts, write `JUDGE none | <provider:model> | <repo@sha or none> | no verdict: host refusal: <the host's reason>`. Do not send the content another way. Ask the owner for a DECISION.
 - A FAIL never sends the handoff to another judge.
 
 The lead adds one line below the stored handoff for each teammate at another provider.
