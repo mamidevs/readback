@@ -250,6 +250,7 @@ Read the task before editing. Use the resolver's registry, working directory and
 Publish with the same arguments and `--request <json-file>`. Supply the snapshot's `expected_generation` and `expected_block_sha256`, a unique `operation_id`, `records`, `log_lines`, `open` and `next`.
 Submit changes to project-wide GOAL or IN FORCE using the whole-CURRENT request and its original document digest. Preserve all existing task blocks.
 All record, LOG and CURRENT writes go through this publisher.
+Run `scripts/record_preflight.py` on a request before you publish it. It reports and refuses nothing.
 
 ## LOG: something that outlives the session changed
 
