@@ -36,6 +36,11 @@ HELPERS = {
         "execution  codex | gpt-5 | high | cli | none",
         "receipt    none | no record was stored",
     ],
+    "skipped": [
+        "JUDGE      skipped | none:none | none | judge mode gate skips a step review (settings); no provider call",
+        "execution  none | none | none | cli | none",
+        "receipt    att-3 | no review | validation unavailable | /tmp/review/att-3.json",
+    ],
     "off": [
         "JUDGE      off | none:none | none | judge mode off (settings); no provider call",
         "execution  none | none | none | cli | none",
@@ -115,6 +120,83 @@ class ReviewTests(Base):
         res = run("review", "--handoff", HND, "--contract", CON,
                   "--helper-output", self.helper_file("pass"))
         self.assertEqual(res.returncode, 0)
+
+
+class SelfCheckTests(Base):
+    """The script prints no note that its own check rejects."""
+
+    def assert_checks_valid(self, stdout):
+        path = self.write("printed.txt", stdout)
+        res = run("check", path)
+        self.assertEqual(res.returncode, 0, stdout + res.stdout + res.stderr)
+
+    def refused_review(self, judge_line):
+        path = self.write("bad-helper.txt", "\n".join([judge_line] + HELPERS["pass"][1:]) + "\n")
+        res = run("review", "--handoff", HND, "--contract", CON, "--helper-output", path)
+        self.assertEqual(res.returncode, 2, res.stdout + res.stderr)
+        self.assertEqual(res.stdout, "")
+        self.assertEqual(len(res.stderr.strip().split("\n")), 1, res.stderr)
+        self.assertIn("JUDGE", res.stderr)
+
+    def test_review_refuses_a_judge_line_with_one_field(self):
+        self.refused_review("JUDGE PASS")
+
+    def test_review_refuses_a_judge_line_with_three_fields(self):
+        self.refused_review("JUDGE      PASS | codex:gpt-5 | readback@abc1234")
+
+    def test_review_refuses_a_judge_line_with_an_unknown_first_field(self):
+        for word in ("pass", "MAYBE", "yes"):
+            with self.subTest(word):
+                self.refused_review("JUDGE      %s | a | b | c" % word)
+
+    def test_the_judge_case_of_the_gate(self):
+        path = self.write("gate.txt", "JUDGE PASS\nexecution codex | model | high | cli | none\n"
+                                      "receipt none | no record was stored\n")
+        res = run("review", "--handoff", HND, "--contract", CON, "--helper-output", path)
+        self.assertEqual((res.returncode, res.stdout), (2, ""))
+
+    def test_check_accepts_every_review_that_exits_zero(self):
+        for kind in HELPERS:
+            for extra in ((), ["more text"]):
+                with self.subTest(kind=kind):
+                    self.assert_checks_valid(self.review(kind, extra))
+        with self.subTest("key with a tab"):
+            path = self.write("tab.txt", "JUDGE\tPASS | a | b | c\nexecution\tx\nreceipt\tnone | r\n")
+            res = run("review", "--handoff", HND, "--contract", CON, "--helper-output", path)
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assert_checks_valid(res.stdout)
+
+    def test_check_accepts_every_acceptance_that_exits_zero(self):
+        calls = [
+            ((), "NOTE-20261123-03", "yes"),
+            (("--reason", "ok"), NOTE, "yes"),
+            (("--reason", "ACC-3 has no test"), NOTE, "no"),
+            (("--reason", "a | b | c"), NOTE, "no"),
+            (("--reason", "  padded   inside\tand tab  "), NOTE, "no"),
+            (("--reason", "ends with a bar |"), NOTE, "no"),
+            (("--reason", "yes | no"), NOTE, "no"),
+            (("--reason", "\u00a0\u2028odd"), NOTE, "no"),
+            (("--rests-on", "a", "--rests-on", "b"), NOTE, "yes"),
+            (("--rests-on", "  spaced  out | with bar "), NOTE, "yes"),
+            (("--rests-on", "x", "--reason", "r"), "none", "no"),
+            ((), "none", "yes"),
+            ((), "NOTE-20261123-12", "yes"),
+            ((), "NOTE-20261123-123456", "yes"),
+        ]
+        for extra, review, accepted in calls:
+            with self.subTest(extra=extra, review=review, accepted=accepted):
+                res = self.acceptance(*extra, review=review, accepted=accepted)
+                self.assertEqual(res.returncode, 0, res.stderr)
+                self.assert_checks_valid(res.stdout)
+
+    def test_acceptance_text_that_check_would_reject_is_refused(self):
+        for extra in (("--rests-on", "\u2028"),):
+            with self.subTest(extra):
+                res = self.acceptance(*extra)
+                if res.returncode == 0:
+                    self.assert_checks_valid(res.stdout)
+                else:
+                    self.assertEqual((res.returncode, res.stdout), (2, ""))
 
 
 class AcceptanceTests(Base):
