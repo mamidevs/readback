@@ -722,8 +722,8 @@ class CrlfTests(Base):
         text = text_handoff(H1, C1, below=["JUDGE PASS | a | b | c"]).replace("\nJUDGE", "\rJUDGE")
         self.assertEqual(self.states({H1: text}), {H1: "open"})
 
-    def test_a_marker_line_with_a_lone_cr_before_its_line_end_is_no_marker(self):
-        text = text_handoff(H1, C1, above=["ACCEPTED yes | d"]).replace("\n", "\r\n") + MARKER + "\r\r\n"
+    def test_a_marker_line_that_ends_in_a_lone_cr_is_no_marker(self):
+        text = text_handoff(H1, C1, above=["ACCEPTED yes | d"]).replace("\n", "\r\n") + MARKER + "\r"
         self.assertEqual(self.states({H1: text}), {H1: "accepted"})
 
     def test_a_marker_with_spaces_and_a_final_line_without_a_line_end(self):
@@ -773,6 +773,60 @@ class CrlfTests(Base):
         for rid, text in records.items():
             (source / (rid + ".md")).write_text(text, encoding="utf-8", newline="")
         self.assert_same_bytes_with_crlf(source)
+
+
+def load_module():
+    sys.dont_write_bytecode = True
+    sys.path.insert(0, str(ROOT / "scripts"))
+    try:
+        import open_work
+    finally:
+        sys.path.remove(str(ROOT / "scripts"))
+    return open_work
+
+
+class CrlfFunctionTests(unittest.TestCase):
+    """The functions that take the text of a record read CRLF as LF themselves."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.mod = load_module()
+
+    def test_the_judge_call_of_embedded_lines(self):
+        self.assertEqual(self.mod.embedded_lines("ACCEPTED yes | 2026-11-23\r\n<!-- readback lead -->\r\n"), (None, None))
+
+    def test_embedded_lines_gives_the_same_result_for_crlf_and_lf(self):
+        lf = "JUDGE PASS | a | b | c\nACCEPTED no | d | r\n" + MARKER + "\nJUDGE FAIL | a | b | c\nACCEPTED yes | d\n"
+        self.assertEqual(self.mod.embedded_lines(lf.replace("\n", "\r\n")), self.mod.embedded_lines(lf))
+        self.assertEqual(self.mod.embedded_lines(lf), ("JUDGE FAIL | a | b | c", "ACCEPTED yes | d"))
+
+    def test_first_line_gives_the_same_result_for_crlf_and_lf(self):
+        lf = envelope(N1) + "\n# Verdict for %s\nbody\n" % H1
+        self.assertEqual(self.mod.first_line(lf.replace("\n", "\r\n")), self.mod.first_line(lf))
+        self.assertEqual(self.mod.first_line(lf), "# Verdict for %s" % H1)
+
+    def test_link_values_gives_the_same_result_for_crlf_and_lf(self):
+        for text in (json_handoff(H1, C1, replaces=H2, below=[JUDGE]), text_handoff(H1, C1, replaces=H2, below=[JUDGE])):
+            with self.subTest(text[:40]):
+                self.assertEqual(self.mod.link_values(text.replace("\n", "\r\n")), self.mod.link_values(text))
+                self.assertEqual(self.mod.link_values(text), {"contract_id": C1, "replaces": H2})
+
+    def test_analyse_gives_the_same_result_for_crlf_records_and_lf_records(self):
+        lf = {C1: contract(C1), H1: json_handoff(H1, C1, below=[JUDGE, "ACCEPTED yes | d"]),
+              H2: text_handoff(H2, C1, above=["ACCEPTED yes | d"], below=["x"]), N1: acceptance_note(N1, H1, C1),
+              N2: free_note(N2, "# Verdict for %s" % H2, [JUDGE, MARKER, "nothing"])}
+        crlf = {k: v.replace("\n", "\r\n") for k, v in lf.items()}
+        self.assertEqual(self.mod.analyse(crlf), self.mod.analyse(lf))
+        self.assertEqual(self.mod.analyse(lf)["handoffs"]["open"], [H2])
+
+    def test_the_line_end_rule_gives_the_same_text_when_applied_twice(self):
+        for text in ("a\r\r\nb", "a\r\n\r\nb\r", "\r\r\r\n", "a\rb", "x\r\ny\r\r\n"):
+            with self.subTest(repr(text)):
+                self.assertEqual(self.mod.lf(self.mod.lf(text)), self.mod.lf(text))
+
+    def test_a_lone_cr_stays_in_the_functions(self):
+        self.assertEqual(self.mod.embedded_lines("a\rJUDGE x\n"), (None, None))
+        self.assertEqual(self.mod.embedded_lines("JUDGE x\r\rACCEPTED yes\r\n"), ("JUDGE x\r\rACCEPTED yes", None))
 
 
 class ExitTwoTests(Base):

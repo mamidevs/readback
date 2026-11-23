@@ -27,6 +27,6 @@ Measured reasons: on 2026-11-23 the lead rewrote the open work of one task block
 
 - The script reads form and links; it does not show that a verdict is right.
 - A contract without a linked handoff is `unbound`, not closed.
-- Each CRLF in a record is read as LF. A lone CR stays, so a lead marker line with a CR before its line end is not a marker.
+- Each CR run before an LF in a record is read as LF. A CR not before an LF stays, so a lead marker line that ends in a CR without an LF is not a marker.
 - A record that is not UTF-8 text is counted in `records`, is listed as `unreadable` and stands in no other list.
 - Stored records stay as they are. The script does not store a note and does not publish.
