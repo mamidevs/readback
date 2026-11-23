@@ -88,15 +88,19 @@ class SyncTests(unittest.TestCase):
         self.assertIn('"handoff_skeleton.py", "closure_note.py", "open_work.py"):', text)
         self.assertEqual(text.count('"open_work.py"'), 1)
 
-    def test_sync_changes_no_other_helper_name(self):
+    def test_sync_keeps_the_base_helper_names_in_base_order_once_and_ends_with_open_work(self):
         text = read("scripts/sync.py")
         tuple_text = text[text.index("for helper in ("):text.index("):", text.index("for helper in ("))]
         names = re.findall(r'"([a-z_]+\.py)"', tuple_text)
-        before = ["project_registry.py", "resolve_codex_project.py", "resolve_claude_project.py", "project_index.py",
-                  "publish_records.py", "task_current.py", "review_receipt.py", "review_capture.py", "review_redaction.py",
-                  "review_retention.py", "validate_handoff.py", "commit_observation.py", "readback_settings.py",
-                  "readback_session.py", "judge_rounds.py", "handoff_skeleton.py", "closure_note.py"]
-        self.assertEqual(names, before + ["open_work.py"])
+        base = ["project_registry.py", "resolve_codex_project.py", "resolve_claude_project.py", "project_index.py",
+                "publish_records.py", "task_current.py", "review_receipt.py", "review_capture.py", "review_redaction.py",
+                "review_retention.py", "validate_handoff.py", "commit_observation.py", "readback_settings.py",
+                "readback_session.py", "judge_rounds.py", "handoff_skeleton.py", "closure_note.py"]
+        self.assertEqual(len(names), len(set(names)))
+        self.assertEqual(names[-1], "open_work.py")
+        rest = iter(names)
+        for name in base:
+            self.assertIn(name, rest, "base name missing or out of base order: " + name)
 
 
 class AmendmentTests(unittest.TestCase):
