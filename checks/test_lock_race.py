@@ -127,6 +127,90 @@ class LockRaceTests(unittest.TestCase):
             with pr._lock(self.path, time.monotonic() + 5):
                 self.fail("lock must not be taken")
 
+    def record_sleeps(self):
+        sleeps = []
+        real_sleep = time.sleep
+
+        def recorder(seconds):
+            sleeps.append(seconds)
+            real_sleep(seconds)
+        return sleeps, recorder
+
+    def test_every_pause_between_tries_is_at_most_twenty_milliseconds(self):
+        sleeps, recorder = self.record_sleeps()
+        with mock.patch.object(pr.os, "open", self.fake_open(None)), \
+                mock.patch.object(pr.time, "sleep", recorder):
+            with self.assertRaises(pr.RegistryError):
+                with pr._lock(self.path, time.monotonic() + 0.2):
+                    self.fail("lock must not be taken")
+        self.assertGreaterEqual(len(sleeps), 1)
+        self.assertEqual(len(sleeps), self.lock_calls - 1)
+        for pause in sleeps:
+            self.assertLessEqual(pause, 0.02)
+
+    def test_pause_is_shorter_when_less_than_twenty_milliseconds_remain(self):
+        sleeps, recorder = self.record_sleeps()
+        with mock.patch.object(pr.os, "open", self.fake_open(None)), \
+                mock.patch.object(pr.time, "sleep", recorder):
+            with self.assertRaises(pr.RegistryError):
+                with pr._lock(self.path, time.monotonic() + 0.005):
+                    self.fail("lock must not be taken")
+        self.assertGreaterEqual(len(sleeps), 1)
+        self.assertLessEqual(sleeps[0], 0.005)
+        for pause in sleeps:
+            self.assertLessEqual(pause, 0.02)
+
+    def test_fifo_at_the_lock_name_is_not_a_regular_file_and_is_refused(self):
+        # O_RDWR on a FIFO does not block, so the open call reaches the file kind check.
+        os.mkfifo(self.path)
+        with self.assertRaises(pr.RegistryError) as caught:
+            with pr._lock(self.path, time.monotonic() + 5):
+                self.fail("lock must not be taken")
+        # The cleanup unlock of a FIFO raises OSError and hides the message of the
+        # refusal behind the control-directory error of today. The refusal itself
+        # stays visible as the context of that error.
+        self.assertEqual(caught.exception.code, "INVALID")
+        self.assertEqual(str(caught.exception), "Unsafe or unavailable control directory")
+        refusal = caught.exception.__cause__.__context__
+        self.assertIsInstance(refusal, pr.RegistryError)
+        self.assertEqual(str(refusal), "Lock must be an independent regular file")
+
+    def test_lock_file_replaced_after_the_lock_is_taken_is_detected(self):
+        path = self.path
+        real_flock = pr.fcntl.flock
+
+        def flock(fd, operation):
+            real_flock(fd, operation)
+            if operation & pr.fcntl.LOCK_EX:
+                # The file passed the kind check; now another file takes the name.
+                path.unlink()
+                path.write_text("")
+        with mock.patch.object(pr.fcntl, "flock", flock):
+            with self.assertRaises(pr.RegistryError) as caught:
+                with pr._lock(path, time.monotonic() + 5):
+                    self.fail("lock must not be taken")
+        self.assertEqual(caught.exception.code, "INVALID")
+        self.assertEqual(str(caught.exception), "Persistent lock file was replaced")
+
+    def test_parent_directory_replaced_during_the_lock_is_detected(self):
+        control = self.base / "control"
+        control.mkdir(mode=0o700)
+        path = control / "projects.lock"
+        real = self.real_open
+
+        def opener(name, flags, *args, **kwargs):
+            fd = real(name, flags, *args, **kwargs)
+            if self.is_lock_open(name, flags):
+                os.rename(control, self.base / "moved")
+                control.mkdir(mode=0o700)
+            return fd
+        with mock.patch.object(pr.os, "open", opener):
+            with self.assertRaises(pr.RegistryError) as caught:
+                with pr._lock(path, time.monotonic() + 5):
+                    self.fail("lock must not be taken")
+        self.assertEqual(caught.exception.code, "INVALID")
+        self.assertEqual(str(caught.exception), "Control directory was replaced")
+
 
 if __name__ == "__main__":
     unittest.main()
