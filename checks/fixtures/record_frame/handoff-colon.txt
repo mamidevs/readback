@@ -1,0 +1,14 @@
+id: HND-20261117-01
+from: worker
+date: 2026-11-17
+state: DONE
+readback: task: x | limits: y | done when: ACC-1, ACC-2
+summary: Done.
+changes: none
+commit: none
+checks: sh a.sh | exit 0 | ok
+          sh b.sh | exit 0 | ok
+contract: ACC-1 VERIFIED | ACC-2 VERIFIED
+open: -
+issues: -
+next: Accept.

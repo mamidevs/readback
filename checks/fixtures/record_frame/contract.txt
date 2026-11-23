@@ -1,0 +1,4 @@
+CON-20261117-01  Do the thing.
+ACC-1  The tool shall work.   Check: sh a.sh
+ACC-2  The tool shall pass.   Check: sh b.sh
+Out of scope: everything else

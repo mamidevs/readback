@@ -58,6 +58,25 @@ Text form
   is the raw text before the one exit-code segment and may hold ` | `. A tool
   call line is `<Tool> tool, ... | no exit code (tool call) | <result>`.
 
+The frame of a stored record (version 2.2)
+  A stored record is the publisher's envelope line, the body and the lead's
+  lines after an explicit marker. The envelope is one line that starts with
+  `<!-- readback ` and ends with `-->` (trailing ASCII spaces, tabs and a
+  carriage return are not counted); the lead marker is not an envelope. Only the
+  first line that is not blank can be the envelope, in a contract and in a
+  handoff. It is left out and gives no finding. A second envelope line, or one
+  further down, is an ordinary line.
+  The lead marker is a line at column 0 that is exactly `<!-- readback lead
+  -->`, with only spaces and tabs after it. Only the first such line counts. In a
+  handoff, in any of the three forms, the handoff ends before the marker.
+  Limit: text after the lead marker is not part of the handoff and is not
+  checked; the marker line is not read either. The lead's lines (`JUDGE`,
+  `execution`, `receipt`, `ACCEPTED` and a note) are read only below a marker.
+  An indented line, a JSON string and a line that holds the marker text after
+  other text never end the handoff. A handoff without the marker is read to its
+  end as in version 2.1, so text after a JSON object and a column-0 line that
+  starts with `JUDGE` are read as before. A contract is read to its end.
+
 Matching for V4 and V6 (no transformation)
   A check text and a command are the same only when the two raw strings are
   equal with `==` after removing ASCII spaces and tabs at both ends. Nothing
@@ -95,7 +114,7 @@ import json
 import re
 import sys
 
-VALIDATOR_VERSION = "2.1.0"
+VALIDATOR_VERSION = "2.2.0"
 
 REQUIRED_KEYS = (
     "id", "from", "date", "state", "readback", "summary", "changes",
@@ -187,6 +206,32 @@ def _split_text(text, colon_keys=False, sections=False):
     return pairs, problems, found
 
 
+_ENVELOPE_START = "<!-- readback "
+_LEAD_MARKER = "<!-- readback lead -->"
+
+
+def _unframe(text):
+    """The text without the publisher's envelope line, when that line is the first line
+    that is not blank and is not the lead marker. Any other text is returned as it is."""
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if line.strip():
+            if (line.startswith(_ENVELOPE_START) and line.rstrip(" \t\r").endswith("-->")
+                    and line.rstrip(" \t") != _LEAD_MARKER):
+                return "\n".join(lines[i + 1:])
+            break
+    return text
+
+
+def _cut_lead(text):
+    """A handoff without its first lead marker line and the lines after it."""
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if line.rstrip(" \t") == _LEAD_MARKER:
+            return "\n".join(lines[:i])
+    return text
+
+
 def _load_json(text):
     """Return (_Pairs, None) for a JSON object, else (None, reason)."""
     try:
@@ -220,6 +265,7 @@ def parse_handoff(text):
     """
     result = {"form": "text", "ok": True, "pairs": [], "values": {}, "own_values": {}, "extra": {},
               "problems": [], "checks_lines": []}
+    text = _cut_lead(_unframe(text))
     if _looks_json(text):
         result["form"] = "json"
         obj, err = _load_json(text)
@@ -285,6 +331,7 @@ def parse_contract(text):
     """
     result = {"form": "text", "ok": True, "id": None, "ids": [], "task": None,
               "statements": [], "out_of_scope": None, "extra": {}, "problems": []}
+    text = _unframe(text)
     if _looks_json(text):
         result["form"] = "json"
         obj, err = _load_json(text)
