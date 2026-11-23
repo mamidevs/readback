@@ -413,7 +413,18 @@ def _registry_path(path):
 def _lock(path, deadline):
     _secure_components(path, missing_leaf=True)
     with _directory_fd(path.parent) as parent_fd:
-        fd = os.open(path.name, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600, dir_fd=parent_fd)
+        while True:
+            try:
+                fd = os.open(path.name, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600, dir_fd=parent_fd)
+                break
+            except FileNotFoundError:
+                # Measured on macOS 27.0: two processes that create the same new
+                # name below one directory descriptor get one FileNotFoundError in
+                # 40 of 40 trials; a path-based open shows none. Open again until
+                # the deadline; the last error then leaves as the INVALID error.
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(min(0.02, max(0, deadline - time.monotonic())))
         try:
             info = os.fstat(fd)
             require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1, "Lock must be an independent regular file")
