@@ -41,6 +41,7 @@ If the task names a contract and you cannot read its statements, return UNABLE. 
 For a code step, submit the local commit and the evidence for that revision.
 Cite the trusted run of the named checks for that commit. Mark pending checks UNVERIFIED and report PARTIAL.
 When the results arrive, update the handoff from that run.
+When the lead gives a skeleton, fill it and return it as your whole report.
 You may start another assigned, independent task immediately after handoff. Dependent work uses the accepted revision.
 
 The handoff has these keys in this order. Use JSON with the same keys when a script checks it.

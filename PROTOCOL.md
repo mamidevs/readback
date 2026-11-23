@@ -114,6 +114,8 @@ Out of scope: <what the worker must not change>
 Put the complete contract in the worker's prompt, or the path of its record.
 The complete contract holds its statements, their checks and the out-of-scope line.
 A contract id alone delivers no statement.
+Write one command in each Check. Join commands that belong together with `sh -c`.
+Run `scripts/handoff_skeleton.py` on the contract and put the skeleton that it prints into the worker's prompt.
 
 The contract is the limit of the work. The worker adds nothing to it.
 A change to the scope that the owner approved needs a GO.
@@ -260,6 +262,7 @@ Reserve mutation tests for a named contract check or a specific doubt about what
 Name the part's checks in its contract before work starts. Each check must exercise the behaviour the owner requested.
 After all pieces join, run those checks on the clean joined revision. Keep the revision, commands, outputs and results together.
 Close the part only when those checks pass and cover every requested outcome. Record any remaining outcome as open.
+Send the results of the joined run to the worker before the judge call, and judge the updated handoff.
 In mode each, the outside judge screens each step; a step PASS accepts nothing, and a step FAIL sends the work back.
 An acceptance without a judge needs structural validation true.
 In the modes gate and each, the acceptance of a part needs a gate PASS.
@@ -276,6 +279,8 @@ The lead adds two lines below the stored handoff. It does not change the worker'
 JUDGE     <PASS, FAIL or none> | <the judge> | <repo@sha or none> | <what the judge found, or —>
 ACCEPTED  <yes or no> | <date> | <the reason, when no>
 ```
+
+Write the line `<!-- readback lead -->` above the JUDGE line of a stored handoff.
 
 Copy the helper's complete JUDGE line; ACCEPTED records what the acceptance rests on.
 Read the full outside-judge answer. Before ACCEPTED, copy the JUDGE, execution and receipt lines into the handoff. Record any finding needed to explain the decision in your own words, omitting sensitive details. The completed receipt holds the detailed answer for 30 days. Copying it into the permanent handoff would defeat that limit.
