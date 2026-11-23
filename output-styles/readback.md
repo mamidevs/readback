@@ -155,6 +155,7 @@ Dependent work uses the accepted revision.
 
 Use one trusted run of the contract's named checks for the submitted commit.
 Use a lead-controlled script or project CI on a clean checkout with fresh HOME and TMPDIR.
+`scripts/trusted_run.py` is such a script for checks that are shell commands.
 Take commands from the agreed contract. Keep the commit, commands, exit codes and output hashes with the retained outputs.
 Worker and lead may cite that same run. A changed revision needs fresh evidence.
 

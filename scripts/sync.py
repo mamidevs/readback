@@ -74,6 +74,7 @@ def build():
                    "review_receipt.py", "review_capture.py", "review_redaction.py", "review_retention.py", "validate_handoff.py", "commit_observation.py",
                    "readback_settings.py", "readback_session.py", "judge_rounds.py", "handoff_skeleton.py", "closure_note.py", "open_work.py"):
         files[f"readback/scripts/{helper}"] = (ROOT / "scripts" / helper).read_text(encoding="utf-8")
+    files["readback/scripts/trusted_run.py"] = (ROOT / "scripts" / "trusted_run.py").read_text(encoding="utf-8")
     return files
 
 
