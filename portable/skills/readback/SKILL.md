@@ -190,16 +190,18 @@ After a FAIL, send the work back or tell the owner what failed.
 If the state is not DONE, tell the owner what remains.
 Before you accept the part, read the owner's request again. If the contract missed a part of the request, tell the owner.
 
-Add two lines below the stored handoff. Do not change the worker's text.
+Store the handoff when it arrives. Do not change the worker's text and add no line below it.
+Store each judge call as a review note and the acceptance as an acceptance note. `scripts/closure_note.py` prints both.
 
 ```
 JUDGE     <PASS, FAIL or none> | <the judge> | <repo@sha or none> | <what the judge found, or —>
 ACCEPTED  <yes or no> | <date> | <the reason, when no>
 ```
 
+An older stored handoff holds the lead's lines below the worker's text.
 Write the line `<!-- readback lead -->` above the JUDGE line of a stored handoff.
 
-Read the full answer. Store its JUDGE, execution and receipt lines below the handoff. Summarize any finding that affects ACCEPTED without sensitive details. The completed receipt keeps the detailed answer for 30 days.
+Read the full answer. The review note holds its JUDGE, execution and receipt lines. Summarize any finding that affects ACCEPTED without sensitive details. The completed receipt keeps the detailed answer for 30 days.
 
 ```
 JUDGE      <PASS, FAIL or none> | <provider:model> | <repo@sha or none> | <note>
