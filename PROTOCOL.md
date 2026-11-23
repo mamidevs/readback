@@ -273,17 +273,19 @@ After a FAIL, the lead sends the work back or tells the owner what failed.
 If the state is not DONE, the lead tells the owner what remains.
 Before the lead accepts the part, it reads the owner's request again. If the contract missed a part of the request, the lead tells the owner.
 
-The lead adds two lines below the stored handoff. It does not change the worker's text.
+Store the handoff when it arrives. Do not change the worker's text and add no line below it.
+Store each judge call as a review note and the acceptance as an acceptance note. `scripts/closure_note.py` prints both.
 
 ```
 JUDGE     <PASS, FAIL or none> | <the judge> | <repo@sha or none> | <what the judge found, or —>
 ACCEPTED  <yes or no> | <date> | <the reason, when no>
 ```
 
+An older stored handoff holds the lead's lines below the worker's text.
 Write the line `<!-- readback lead -->` above the JUDGE line of a stored handoff.
 
 Copy the helper's complete JUDGE line; ACCEPTED records what the acceptance rests on.
-Read the full outside-judge answer. Before ACCEPTED, copy the JUDGE, execution and receipt lines into the handoff. Record any finding needed to explain the decision in your own words, omitting sensitive details. The completed receipt holds the detailed answer for 30 days. Copying it into the permanent handoff would defeat that limit.
+Read the full outside-judge answer. The review note holds its JUDGE, execution and receipt lines. Record any finding needed to explain the decision in your own words, omitting sensitive details. The completed receipt holds the detailed answer for 30 days. Copying it into the permanent handoff would defeat that limit.
 The output records the provider, requested model, reported model when available, requested effort and execution method.
 Claude Fable receives only Read, Grep and Glob tools. It cannot rerun shell checks.
 Codex runs with its read-only sandbox. CLI settings and managed policies remain part of the trust boundary.

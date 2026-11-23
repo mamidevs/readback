@@ -63,7 +63,7 @@ receipt    <attempt id> | no review | <validation phrase> | <path>
 receipt    none | <reason>
 ```
 
-4. Keep the JUDGE, execution and receipt lines below the handoff. Summarize any finding needed for ACCEPTED without sensitive details. The completed receipt keeps the detailed answer for 30 days. Add ACCEPTED below the original worker text.
+4. The review note holds its JUDGE, execution and receipt lines. Summarize any finding needed for ACCEPTED without sensitive details. The completed receipt keeps the detailed answer for 30 days.
 
 ## Rules
 
