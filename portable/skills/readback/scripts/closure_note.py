@@ -20,8 +20,9 @@ the first line that is not blank. It does not show that the review exists, that
 the judge said PASS, or that the acceptance is justified.
 
 Exit status: 0 for a printed note, or a valid note. 1 for a note with a defect.
-2 for a missing or malformed argument, `--accepted no` without a reason, or a
-file that cannot be read; standard output stays empty and standard error holds
+2 for a missing or malformed argument, `--accepted no` without a reason, a
+file that cannot be read, or a note that `check` would reject (review and
+acceptance run the rules of `check` before they print); standard output stays empty and standard error holds
 one line with the reason. The script writes no file.
 """
 
@@ -191,13 +192,22 @@ def build_parser():
     return parser
 
 
+def self_check(lines):
+    """The script prints no note that its own check rejects."""
+    text = "\n".join(lines) + "\n"
+    findings = check_note(text)["findings"]
+    if findings:
+        raise Refuse("the note would not pass check: " + findings[0])
+    return text
+
+
 def main(argv):
     try:
         args = build_parser().parse_args(argv)
         if args.command == "review":
-            out = "\n".join(make_review(args)) + "\n"
+            out = self_check(make_review(args))
         elif args.command == "acceptance":
-            out = "\n".join(make_acceptance(args)) + "\n"
+            out = self_check(make_acceptance(args))
         elif args.command == "check":
             result = check_note(read_text(args.file, "the note"))
             sys.stdout.write(json.dumps(result) + "\n")
