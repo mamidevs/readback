@@ -672,6 +672,109 @@ class RecordAndOutputTests(Base):
         self.assertEqual(self.states({H1: text}), {H1: "accepted"})
 
 
+class CrlfTests(Base):
+    """A record with CRLF line ends is read as the same record with LF line ends."""
+
+    def crlf(self, text):
+        return text.replace("\n", "\r\n")
+
+    def test_the_judge_case_a_decision_above_the_marker_is_ignored(self):
+        text = "ACCEPTED yes | 2026-11-23\r\n" + MARKER + "\r\n"
+        self.assertEqual(self.states({H1: text_handoff(H1, C1) .replace("\n", "\r\n") + text}), {H1: "open"})
+
+    def test_a_handoff_with_a_decision_above_the_marker_stays_open_and_its_contract_open(self):
+        text = self.crlf(text_handoff(H1, C1, above=["ACCEPTED yes | 2026-11-23"], below=["nothing below"]))
+        records = {C1: contract(C1), H1: text}
+        self.assertEqual(self.states(records), {H1: "open"})
+        self.assertEqual(self.lists(records), {C1: "open"})
+
+    def test_a_json_handoff_with_crlf_envelope_links_and_marker_below_is_accepted_and_closes(self):
+        text = self.crlf(json_handoff(H1, C1, below=[JUDGE, "ACCEPTED yes | 2026-11-23"]))
+        records = {C1: contract(C1), H1: text}
+        self.assertEqual(self.states(records), {H1: "accepted"})
+        self.assertEqual(self.lists(records), {C1: "closed"})
+        self.assertEqual(self.result()["unlinked"], [])
+
+    def test_a_json_handoff_with_crlf_keeps_its_replaces(self):
+        records = {H1: json_handoff(H1, C1), H2: self.crlf(json_handoff(H2, C1, replaces=H1, below=[JUDGE]))}
+        self.assertEqual(self.states(records), {H1: "replaced", H2: "judged"})
+
+    def test_a_legacy_note_with_crlf_ignores_the_lines_above_its_marker(self):
+        note = self.crlf(free_note(N1, "# Verdict for %s" % H1, [JUDGE, "ACCEPTED yes | d", MARKER, "nothing"]))
+        records = {H1: json_handoff(H1, C1), N1: note}
+        self.assertEqual(self.states(records), {H1: "open"})
+        self.assertEqual(self.result()["legacy_notes"], [])
+
+    def test_a_legacy_note_with_crlf_is_attributed_and_applies_its_lines(self):
+        note = self.crlf(free_note(N1, "# Verdict for %s" % H1, [JUDGE, "ACCEPTED yes | d"]))
+        self.assertEqual(self.states({H1: json_handoff(H1, C1), N1: note}), {H1: "accepted"})
+        self.assertEqual(self.result()["legacy_notes"], [{"id": N1, "handoffs": [H1], "attributed": True}])
+
+    def test_closure_notes_with_crlf(self):
+        records = {C1: contract(C1), C2: contract(C2), H1: json_handoff(H1, C1),
+                   N1: self.crlf(review_note(N1, H1, C1)), N2: self.crlf(acceptance_note(N2, H1, C1)),
+                   N3: self.crlf(withdrawal_note(N3, C2))}
+        self.assertEqual(self.states(records), {H1: "accepted"})
+        self.assertEqual(self.lists(records), {C1: "closed", C2: "withdrawn"})
+        self.assertEqual(self.result()["conflicts"], [])
+
+    def test_a_lone_cr_is_left_as_it_is(self):
+        text = text_handoff(H1, C1, below=["JUDGE PASS | a | b | c"]).replace("\nJUDGE", "\rJUDGE")
+        self.assertEqual(self.states({H1: text}), {H1: "open"})
+
+    def test_a_marker_line_with_a_lone_cr_before_its_line_end_is_no_marker(self):
+        text = text_handoff(H1, C1, above=["ACCEPTED yes | d"]).replace("\n", "\r\n") + MARKER + "\r\r\n"
+        self.assertEqual(self.states({H1: text}), {H1: "accepted"})
+
+    def test_a_marker_with_spaces_and_a_final_line_without_a_line_end(self):
+        for ending in ("", "\n"):
+            with self.subTest(repr(ending)):
+                text = text_handoff(H1, C1, above=["ACCEPTED yes | d"]).rstrip("\n") + "\n" + MARKER + "  \t" + ending
+                self.assertEqual(self.states({H1: self.crlf(text)}), {H1: "open"})
+                self.dir.joinpath(H1 + ".md").unlink()
+        text = self.crlf(text_handoff(H1, C1, below=["ACCEPTED yes | d"]).rstrip("\n"))
+        self.assertEqual(self.states({H1: text}), {H1: "accepted"})
+
+    def run_folder(self, folder):
+        res = run_script("--records", folder)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        return res.stdout
+
+    def assert_same_bytes_with_crlf(self, source):
+        lf = Path(self.tmp.name) / "lf"
+        crlf = Path(self.tmp.name) / "crlf"
+        shutil.copytree(source, lf)
+        crlf.mkdir()
+        for path in lf.iterdir():
+            (crlf / path.name).write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+        self.assertEqual(self.run_folder(crlf), self.run_folder(lf))
+
+    def test_each_fixture_folder_gives_the_same_bytes_with_every_lf_replaced_by_crlf(self):
+        for name in ("embedded", "notes"):
+            with self.subTest(name):
+                self.assert_same_bytes_with_crlf(FIXTURES / name)
+                shutil.rmtree(Path(self.tmp.name) / "lf")
+                shutil.rmtree(Path(self.tmp.name) / "crlf")
+
+    def test_a_folder_with_one_record_of_every_form_gives_the_same_bytes_with_crlf(self):
+        source = Path(self.tmp.name) / "source"
+        source.mkdir()
+        records = {
+            C1: contract(C1), C2: contract(C2), C3: contract(C3),
+            H1: json_handoff(H1, C1, below=[JUDGE, "ACCEPTED yes | d"]),
+            H2: text_handoff(H2, C2, below=[JUDGE], marker=False),
+            H3: json_handoff(H3, C2, replaces=H2, below=["ACCEPTED no | d | r"]),
+            H4: text_handoff(H4, C3, above=["ACCEPTED yes | d"], below=["x"]),
+            N1: review_note(N1, H1, C1), N2: acceptance_note(N2, H1, C1), N3: withdrawal_note(N3, C3, C2),
+            N4: free_note(N4, "# Verdict for %s" % H2, [JUDGE]),
+            "NOTE-20261123-75": free_note("NOTE-20261123-75", "# Two %s %s" % (H1, H2), [JUDGE]),
+            "NOTE-20261123-76": review_note("NOTE-20261123-76", H1, C1).replace("kind review", "kind review\nkind review"),
+        }
+        for rid, text in records.items():
+            (source / (rid + ".md")).write_text(text, encoding="utf-8", newline="")
+        self.assert_same_bytes_with_crlf(source)
+
+
 class ExitTwoTests(Base):
     def assert_refused(self, *args):
         res = run_script(*args)
