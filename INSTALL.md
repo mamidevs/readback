@@ -70,6 +70,19 @@ bash checks/outside-judge.sh claude
 
 The last two commands use your provider accounts and consume model calls.
 
+### When the host refuses the judge call
+
+The host can refuse the judge call before the helper starts.
+The call gives the other provider the contract, the handoff and read access to the repository.
+The lead shows the owner the host's reason.
+The lead shows the owner the provider that would judge.
+The lead shows the owner what the call would send.
+The lead writes the `JUDGE none` line with the reason "host refusal".
+The acceptance stays open until a judge call gives a verdict.
+The owner decides whether to authorize this export; the host must also permit the call.
+The lead does not send the content another way.
+The lead does not replace the outside judge with a judge of its own host.
+
 ### Judge line for Claude Code
 
 The plugin ships the hook `hooks/judge_line.py` for the events `UserPromptSubmit`, `SessionStart` and `SessionEnd`. The plugin's `hooks/hooks.json` names it for each event. You add nothing.

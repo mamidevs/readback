@@ -68,6 +68,7 @@ receipt    none | <reason>
 ## Rules
 
 - Exit code 3 means that the call gave no verdict. Write `JUDGE none`. Do not accept the work. Tell the owner.
+- When the host refuses the judge call before the helper starts, write `JUDGE none | <provider:model> | <repo@sha or none> | no verdict: host refusal: <the host's reason>`. Do not send the content another way. Ask the owner for a DECISION.
 - Exit code 0 with JUDGE off or JUDGE skipped is not a verdict.
 - After the checks of the arguments, the settings, the session and the inputs, structural validation runs before the mode decides; false or unavailable blocks a provider call, and unparsed goes to the judge with its findings.
 - Missing tools, invalid configuration and a missed deadline give no verdict. Do not substitute a local judge.
